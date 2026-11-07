@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Faster - Active Orders</title>
+    <link rel="icon" href="favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <style>
+        /* Strict Mobile WebView & iOS Optimization */
+        html, body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #f9fafb;
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        .animate-pulse-fast { animation: pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+        
+        .order-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .order-card:active { transform: scale(0.98); }
+
+        /* Offline Banner */
+        #offlineBanner { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(-100%); }
+        #offlineBanner.show { transform: translateY(0); }
+
+        /* Beautiful Modal Animations */
+        .modal-enter { opacity: 1; pointer-events: auto; display: flex !important; }
+        .modal-leave { opacity: 0; pointer-events: none; }
+        .modal-content-enter { transform: scale(1); opacity: 1; }
+        .modal-content-leave { transform: scale(0.95); opacity: 0; }
+
+        /* Full Screen Media Preview */
+        #fullMediaView { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 10000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+    </style>
+</head>
+<body class="min-h-screen pb-10 flex flex-col">
+
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+    <div id="offlineBanner" class="fixed top-0 left-0 w-full bg-red-500 text-white text-center text-[10px] uppercase tracking-widest py-2 z-[60] font-black shadow-md flex items-center justify-center gap-2">
+        <i class="fas fa-wifi-slash"></i> No Internet Connection
+    </div>
+
+    <header class="sticky top-0 bg-white/90 backdrop-blur-md z-40 p-4 flex items-center border-b border-gray-100 shadow-sm transition-all">
+        <i class="fas fa-chevron-left text-xl mr-4 p-2 cursor-pointer active:scale-90 transition-transform text-gray-700" onclick="window.location.href='home.html'"></i>
+        <h1 class="text-xl font-black text-gray-800 tracking-tight">Active Orders</h1>
+    </header>
+
+    <main class="p-4 flex-1">
+        <div id="activeList" class="space-y-4">
+            <div class="animate-pulse space-y-4">
+                <div class="h-36 bg-gray-200 rounded-[2.5rem]"></div>
+                <div class="h-36 bg-gray-200 rounded-[2.5rem]"></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="billModal" class="modal-leave fixed inset-0 bg-black/80 z-[1000] hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-300" onclick="closeBillModal()">
+        <div id="billModalContent" class="modal-content-leave bg-white rounded-[1.5rem] w-full max-w-sm overflow-hidden shadow-2xl transition-all duration-300 flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+            
+            <div class="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
+                <span class="font-black text-sm uppercase tracking-widest">Order Summary</span>
+                <i class="fas fa-times cursor-pointer text-xl opacity-80 active:opacity-100 transition active:scale-90" onclick="closeBillModal()"></i>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-1 bg-gray-50">
+                <img id="fullBillImg" src="" class="w-full rounded-2xl mb-4 object-contain border border-gray-200 shadow-sm hidden cursor-pointer" onclick="showFull(this.src, 'img')">
+                <div id="modalBreakdown" class="space-y-4"></div>
+            </div>
+            
+            <div class="p-4 bg-white border-t border-gray-100 shrink-0">
+                <button onclick="closeBillModal()" class="w-full py-3.5 bg-gray-100 active:bg-gray-200 text-gray-600 rounded-xl font-black text-xs uppercase tracking-widest transition-colors active:scale-95">Close Details</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fullMediaView" onclick="this.style.display='none'">
+        <div id="fullMediaContainer" class="w-full h-full flex items-center justify-center p-4"></div>
+        <i class="fas fa-times absolute top-6 right-6 text-white text-3xl cursor-pointer"></i>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://hkabhikizdlbavfkualt.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYWJoaWtpemRsYmF2Zmt1YWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0ODgyMjUsImV4cCI6MjA5MjA2NDIyNX0.iMlS6-M1aylW8K915LPYDHOg7qUxwu5GelH_CPHLP2U";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const userPhone = (localStorage.getItem('faster_phone') || "").trim();
+        const customerId = localStorage.getItem('faster_customer_id') || '';
+        
+        let currentOrders = [];
+        let activeTimers = {};
+        let globalDeliveryTime = 30;
+        let unreadCounts = {}; 
+
+        const notifSound = document.getElementById('notifSound');
+        let isAudioUnlocked = false;
+
+        function unlockAudioContext() {
+            if (isAudioUnlocked || !notifSound) return;
+            
+            notifSound.muted = true;
+            notifSound.play().then(() => {
+                notifSound.pause();
+                notifSound.currentTime = 0;
+                notifSound.muted = false;
+                isAudioUnlocked = true;
+                document.removeEventListener('touchstart', unlockAudioContext);
+                document.removeEventListener('click', unlockAudioContext);
+            }).catch(e => console.warn("Audio unlock pending...", e));
+        }
+
+        document.addEventListener('touchstart', unlockAudioContext, { once: true });
+        document.addEventListener('click', unlockAudioContext, { once: true });
+
+        function ring() { 
+            if(!notifSound) return;
+            notifSound.currentTime = 0; 
+            
+            let playPromise = notifSound.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    if (navigator.vibrate) navigator.vibrate([300, 100, 300]); 
+                });
+            } else if (navigator.vibrate) {
+                navigator.vibrate([300, 100, 300]); 
+            }
+        }
+
+        async function init() {
+            if(!customerId) {
+                window.location.replace('index.html');
+                return;
+            }
+
+            if(navigator.onLine) {
+                try {
+                    const { data: settings } = await _supabase.from('app_settings').select('delivery_timer').single();
+                    if (settings && settings.delivery_timer) globalDeliveryTime = settings.delivery_timer;
+                } catch (e) { console.warn("Settings fetch failed"); }
+            }
+
+            await fetchOrders();
+            setupRealtime();
+        }
+
+        let _activeOrdersCh = null, _activeMessagesCh = null, _messagesSeenCh = null;
+        function setupRealtime() {
+            // Sirf apni khud ki 3 channels hatao - removeAllChannels() poori app ki baaki
+            // channels (jaise global-message-notify.js) bhi hata deta tha
+            if (_activeOrdersCh) _supabase.removeChannel(_activeOrdersCh);
+            if (_activeMessagesCh) _supabase.removeChannel(_activeMessagesCh);
+            if (_messagesSeenCh) _supabase.removeChannel(_messagesSeenCh);
+
+            _activeOrdersCh = _supabase.channel('active-orders').on('postgres_changes', { 
+                event: 'UPDATE', schema: 'public', table: 'orders' 
+            }, (payload) => {
+                if (payload.new && payload.new.customer_id === customerId) {
+                    const oldOrder = currentOrders.find(o => o.id.toString() === payload.new.id.toString());
+                    if (oldOrder && (oldOrder.status !== payload.new.status || oldOrder.rider_status !== payload.new.rider_status)) {
+                        ring(); 
+                    }
+                    fetchOrders(); 
+                }
+            }).subscribe();
+
+            _activeMessagesCh = _supabase.channel('active-messages').on('postgres_changes', { 
+                event: 'INSERT', schema: 'public', table: 'order_chats' 
+            }, (payload) => {
+                if(payload.new && payload.new.sender_phone !== userPhone) {
+                    ring(); 
+                    fetchUnreadCounts(); 
+                }
+            }).subscribe();
+
+            _messagesSeenCh = _supabase.channel('messages-seen').on('postgres_changes', { 
+                event: 'UPDATE', schema: 'public', table: 'order_chats' 
+            }, (payload) => {
+                if(payload.new && payload.new.status === 'seen') {
+                    fetchUnreadCounts(); 
+                }
+            }).subscribe();
+        }
+
+        async function fetchOrders() {
+            if(!navigator.onLine) return; 
+
+            try {
+                const { data, error } = await _supabase.from('orders')
+                    .select('*')
+                    .eq('customer_id', customerId)
+                    .neq('status', 'completed')
+                    .neq('status', 'canceled')
+                    .neq('status', 'CANCELLED')
+                    .neq('status', 'cancelled')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+
+                currentOrders = data || [];
+                await fetchUnreadCounts(); 
+            } catch (error) {
+                const list = document.getElementById('activeList');
+                list.innerHTML = `
+                    <p class="text-center text-red-500 font-bold mt-10">Failed to load orders.</p>
+                    <p class="text-center text-xs text-gray-400 mt-2">Error: ${error.message || "Check console"}</p>
+                `;
+            }
+        }
+
+        async function fetchUnreadCounts() {
+            if (!currentOrders || currentOrders.length === 0) {
+                renderOrders(currentOrders);
+                return;
+            }
+            
+            const orderIds = currentOrders.map(o => o.id);
+            
+            try {
+                const { data, error } = await _supabase
+                    .from('order_chats')
+                    .select('order_id')
+                    .in('order_id', orderIds)
+                    .neq('sender_phone', userPhone)
+                    .neq('status', 'seen'); 
+                    
+                let newCounts = {};
+                if (!error && data) {
+                    data.forEach(msg => {
+                        newCounts[msg.order_id] = (newCounts[msg.order_id] || 0) + 1;
+                    });
+                }
+                unreadCounts = newCounts;
+                renderOrders(currentOrders);
+            } catch(e) {
+                renderOrders(currentOrders); 
+            }
+        }
+
+        function renderOrders(orders) {
+            const list = document.getElementById('activeList');
+            
+            if (orders.length === 0) {
+                list.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 opacity-50">
+                        <div class="bg-gray-100 p-6 rounded-full mb-4">
+                            <i class="fas fa-box-open text-5xl text-gray-400"></i>
+                        </div>
+                        <p class="font-black text-sm uppercase tracking-widest text-center text-gray-500">No Active Orders</p>
+                    </div>`;
+                return;
+            }
+
+            Object.values(activeTimers).forEach(clearInterval);
+            activeTimers = {};
+
+            let lastVisit = localStorage.getItem('last_active_orders_visit') || '2000-01-01T00:00:00.000Z';
+
+            list.innerHTML = orders.map(order => {
+                const status = (order.status || 'pending').toLowerCase();
+                const riderStatus = (order.rider_status || '').toLowerCase();
+                const isArrived = (status === 'arrived' || riderStatus === 'arrived');
+                
+                let isStatusNew = order.updated_at > lastVisit;
+
+                let displayStatus = "SEARCHING";
+                let statusColor = "bg-amber-500 text-white animate-pulse";
+                let statusMsg = "Looking for a Rider...";
+                let showTimer = false;
+
+                if (isArrived) {
+                    displayStatus = "ARRIVED";
+                    statusColor = "bg-red-600 text-white animate-pulse-fast shadow-md shadow-red-500/30";
+                    statusMsg = "Rider has arrived! Collect your order.";
+                } else if (status === 'assigned') {
+                    showTimer = true;
+                    if (parseFloat(order.bill_amount) > 0) {
+                        displayStatus = "ON THE WAY";
+                        statusColor = "bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                        statusMsg = "Rider is heading to your location.";
+                    } else {
+                        displayStatus = "PURCHASING";
+                        statusColor = "bg-blue-600 text-white shadow-md shadow-blue-500/30";
+                        statusMsg = "Rider is purchasing your items...";
+                    }
+                }
+
+                // FIX: .slice() ko remove kiya kyunki ID ab direct Number (bigint) ban chuki hai
+                return `
+                <div class="order-card bg-white rounded-[2rem] p-5 shadow-sm border ${isStatusNew ? 'border-red-400 bg-red-50' : 'border-gray-100'} cursor-pointer" onclick="openBillModal(${order.id})">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest ${statusColor}">${displayStatus}</span>
+                            ${isStatusNew ? `<span class="px-2 py-1 bg-red-500 text-white text-[9px] font-bold rounded-full animate-pulse shadow-md shadow-red-500/50"><i class="fas fa-exclamation-circle"></i> UPDATED</span>` : ''}
+                        </div>
+                        <p class="text-[11px] font-mono font-bold text-gray-400 uppercase tracking-widest">ID: #${order.id}</p>
+                    </div>
+                    
+                    <h3 class="text-lg font-black text-gray-800 mb-1 leading-tight">${statusMsg}</h3>
+                    <p class="text-[11px] text-gray-400 font-bold mb-4 flex items-center gap-1">
+                        <i class="far fa-clock"></i> ${dayjs(order.created_at).format('DD MMM, hh:mm A')}
+                    </p>
+
+                    ${showTimer ? `
+                        <div class="p-4 bg-red-50 rounded-3xl border border-red-100 flex flex-col items-center justify-center mb-4 transition-all">
+                            <span class="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Estimated Arrival</span>
+                            <div id="timer-${order.id}" class="text-3xl font-black text-red-600 tracking-tighter tabular-nums">--:--</div>
+                        </div>
+                    ` : ''}
+
+                    <div class="pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100">
+                                <i class="fas fa-motorcycle text-gray-400 text-xs"></i>
+                            </div>
+                            <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Live Tracked</span>
+                        </div>
+                        ${(status === 'assigned' || isArrived) ? 
+                            `<button onclick="event.stopPropagation(); window.location.href='chat.html?orderId=${order.id}'" class="relative bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[11px] font-black shadow-lg shadow-blue-500/20 active:bg-blue-700 transition-colors flex items-center gap-2">
+                                <i class="fas fa-comment-dots"></i> CHAT
+                                ${unreadCounts[order.id] ? `<span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm animate-bounce font-bold">${unreadCounts[order.id]}</span>` : ''}
+                            </button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+            orders.forEach(o => {
+                const status = (o.status || 'pending').toLowerCase();
+                const riderStatus = (o.rider_status || '').toLowerCase();
+                if (status === 'assigned' && riderStatus !== 'arrived' && status !== 'arrived') {
+                    runTimer(o.id, o.assigned_at);
+                }
+            });
+        }
+
+        function runTimer(id, assignedAt) {
+            const start = assignedAt ? dayjs(assignedAt) : dayjs();
+            const end = start.add(globalDeliveryTime, 'minute');
+            
+            const update = () => {
+                const el = document.getElementById(`timer-${id}`);
+                if (!el) { clearInterval(activeTimers[id]); return; }
+                const diff = end.diff(dayjs());
+                const abs = Math.abs(diff);
+                const m = Math.floor(abs / 60000);
+                const s = Math.floor((abs % 60000) / 1000);
+                
+                el.innerText = (diff < 0 ? '-' : '') + `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if (diff < 0) { el.classList.remove('text-red-600'); el.classList.add('text-gray-400'); }
+            };
+            
+            update();
+            activeTimers[id] = setInterval(update, 1000);
+        }
+
+        function openBillModal(orderId) {
+            localStorage.setItem('last_active_orders_visit', new Date().toISOString());
+            renderOrders(currentOrders); 
+
+            // FIX: Comparison ko robust kiya string aur number dono states matching handle karne k liye
+            const order = currentOrders.find(o => o.id.toString() === orderId.toString());
+            if (!order) return;
+
+            const modal = document.getElementById('billModal');
+            const content = document.getElementById('billModalContent');
+            const imgEl = document.getElementById('fullBillImg');
+            
+            if(order.bill_image) {
+                imgEl.src = order.bill_image;
+                imgEl.classList.remove('hidden');
+            } else {
+                imgEl.classList.add('hidden');
+            }
+
+            const currentOrder = parseFloat(order.item_price || 0) + parseFloat(order.dc_amount || 0);
+            const pending = parseFloat(order.previous_due || 0);
+            const totalBill = parseFloat(order.bill_amount || 0);
+
+            let statusBadge = "Calculating Bill...";
+            let statusColor = "text-amber-600 bg-amber-50 border-amber-200 animate-pulse";
+            if (totalBill > 0) {
+                statusBadge = "Please pay this amount to rider";
+                statusColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+            }
+
+            const mediaHelper = (str, type) => {
+                if(!str) return '';
+                return str.split(',').map(url => {
+                    const u = url.trim();
+                    if(type === 'img') return `<img src="${u}" class="w-full rounded-xl border border-gray-200 cursor-pointer object-cover max-h-32 mb-2 shadow-sm" onclick="showFull('${u}', 'img')">`;
+                    if(type === 'vid') return `<video src="${u}" controls playsinline class="w-full rounded-xl border border-gray-200 cursor-pointer object-cover max-h-32 mb-2 shadow-sm"></video>`;
+                }).join('');
+            };
+
+            const breakdownHTML = `
+                <div class="mb-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                    <p class="text-[9px] font-black text-blue-400 uppercase tracking-widest text-center mb-3">Original Details</p>
+                    
+                    ${order.order_details ? `<p class="text-[13px] font-bold text-gray-800 mb-3 leading-relaxed whitespace-pre-wrap">${order.order_details}</p>` : ''}
+                    
+                    ${order.voice_url ? `
+                        <div class="mb-3">
+                            <p class="text-[9px] text-blue-500 font-black uppercase tracking-widest mb-1.5">Voice Instruction:</p>
+                            <audio controls class="w-full h-8"><source src="${order.voice_url}" type="audio/mpeg"></audio>
+                        </div>` : ''}
+                    
+                    <div class="mt-2">${mediaHelper(order.image_url, 'img')}${mediaHelper(order.video_url, 'vid')}</div>
+                </div>
+                
+                <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center mb-3 pb-2 border-b border-gray-100">Payment Breakdown</p>
+                    
+                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-2">
+                        <span>Items + Delivery:</span><span class="font-mono text-gray-800">Rs. ${currentOrder}</span>
+                    </div>
+                    
+                    ${pending != 0 ? `
+                    <div class="flex justify-between text-xs font-bold text-gray-400 mb-2">
+                        <span>Previous Dues:</span><span class="font-mono ${pending > 0 ? 'text-red-500' : 'text-emerald-500'}">Rs. ${pending}</span>
+                    </div>` : ''}
+                    
+                    <div class="border-t border-dashed border-gray-200 my-3 pt-3 flex justify-between text-sm font-black text-gray-900">
+                        <span>Total Payable:</span><span class="font-mono text-lg">Rs. ${totalBill}</span>
+                    </div>
+                    
+                    <div class="mt-3 p-2.5 rounded-xl text-center text-[10px] font-black uppercase tracking-widest border ${statusColor}">
+                        ${statusBadge}
+                    </div>
+                </div>
+                
+                <div class="mt-4 p-4 bg-white rounded-2xl border border-gray-100 flex items-start gap-4 shadow-sm">
+                    <div class="bg-blue-50 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+                        <i class="fas fa-map-marker-alt text-blue-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Delivery Address</h4>
+                        <p class="text-xs font-bold text-gray-800 leading-relaxed">${order.delivery_address || 'N/A'}</p>
+                    </div>
+                </div>`;
+            
+            document.getElementById('modalBreakdown').innerHTML = breakdownHTML;
+            
+            modal.classList.replace('modal-leave', 'modal-enter');
+            content.classList.replace('modal-content-leave', 'modal-content-enter');
+        }
+
+        function closeBillModal() {
+            const modal = document.getElementById('billModal');
+            const content = document.getElementById('billModalContent');
+            content.classList.replace('modal-content-enter', 'modal-content-leave');
+            setTimeout(() => {
+                modal.classList.replace('modal-enter', 'modal-leave');
+            }, 300);
+        }
+
+        function showFull(url, type) {
+            const container = document.getElementById('fullMediaContainer');
+            document.getElementById('fullMediaView').style.display = 'flex';
+            container.innerHTML = type === 'img' ? 
+                `<img src="${url}" class="max-w-[95%] max-h-[85vh] object-contain rounded-2xl border-4 border-white shadow-2xl">` : 
+                `<video src="${url}" controls autoplay playsinline class="max-w-[95%] max-h-[85vh] rounded-2xl shadow-2xl border-4 border-white"></video>`;
+        }
+        
+        const offlineBanner = document.getElementById('offlineBanner');
+        
+        window.addEventListener('offline', () => offlineBanner.classList.add('show'));
+        window.addEventListener('online', () => { offlineBanner.classList.remove('show'); fetchOrders(); });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && navigator.onLine) { fetchOrders(); }
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                if(navigator.onLine) fetchOrders();
+            }
+        });
+
+        window.onload = init;
+    </script>
+
+    <script src="global-message-notify.js"></script>
+</body>
+</html>
