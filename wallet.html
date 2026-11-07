@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faster - Smart Wallet</title>
+    <link rel="icon" href="favicon.ico">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        
+        /* =========================================================================
+         🎨 YAHAN SE AAP APP KE COLORS CHANGE KAR SAKTE HAIN (EASY CUSTOMIZATION) 
+           ========================================================================= */
+        :root {
+            /* APP BACKGROUND - Poori app ke background ka color */
+            --app-bg-color: whitesmoke; 
+            
+            /* HEADER COLOR - Upar Top bar (My Smart Wallet) ka background */
+            --header-bg-color: white; 
+
+            /* 💳 MAIN WALLET CARD - Background fix rakhne ke liye */
+            --card-static-bg: #14508C; /* Card ka single pakka color */
+            
+            /* STATUS BASED RS. TEXT COLORS (Rs. 0 Ka Rang Status Ke Mutabik) */
+            --balance-text-normal: #ffffff;   /* Jab balance 0 ho (All Clear) */
+            --balance-text-advance: #22c55e;  /* Jab advance balance ho (Green) */
+            --balance-text-owe: #ef4444;      /* Jab pending payment ho (Red) */
+
+            /* 📜 TRANSACTION HISTORY CARDS CUSTOMIZATION (BACKGROUND, TEXT & BORDERS) */
+            /* A. Order: Settled (All Clear) */
+            --tx-settled-bg: #ffffff;
+            --tx-settled-text: #1e293b;
+            --tx-settled-border: white;
+
+            /* B. Order: Pending (You Owe Us) */
+            --tx-pending-bg: #ffffff;
+            --tx-pending-text: #1e293b;
+            --tx-pending-border: white;
+
+            /* C. Order: Advance Balance */
+            --tx-advance-bg: #ffffff;
+            --tx-advance-text: #1e293b;
+            --tx-advance-border: white;
+
+            /* D. Order: Settled via Rider */
+            --tx-rider-bg: #ffffff;
+            --tx-rider-text: #1e293b;
+            --tx-rider-border: white;
+
+            /* E. Order: Settled via Top-Up */
+            --tx-topup-settled-bg: #ffffff;
+            --tx-topup-settled-text: #1e293b;
+            --tx-topup-settled-border: white;
+
+            /* F. Generic Settings (Top-Up / Withdraw Cards Ke Borders) */
+            --tx-generic-bg: #ffffff;
+            --tx-generic-text: #1e293b;
+            --tx-border-topup-approved: white;  /* Top-Up Approved ka border */
+            --tx-border-topup-rejected: white;  /* Top-Up Rejected ka border */
+            --tx-border-topup-pending: white;   /* Top-Up Pending ka border */
+            --tx-border-withdraw-approved: white;/* Withdraw Approved ka border */
+            --tx-border-withdraw-rejected: white;/* Withdraw Cancelled ka border */
+            --tx-border-withdraw-pending: white; /* Withdraw Pending ka border */
+
+            /* TOP-UP & WITHDRAW BUTTON COLORS */
+            --btn-topup-bg: rgba(255, 255, 255, 20%);      
+            --btn-topup-text: white;    
+            --btn-withdraw-bg: rgba(255, 255, 255, 10%);    
+            --btn-withdraw-border: white; 
+            --btn-withdraw-text: white;                    
+        }
+
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--app-bg-color); }
+        .header-custom { background-color: var(--header-bg-color); }
+        .wallet-card { 
+            background: var(--card-static-bg); 
+            transition: all 0.5s ease; 
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
+        }
+        .btn-topup { background-color: var(--btn-topup-bg) !important; color: var(--btn-topup-text) !important; }
+        .btn-withdraw { background-color: var(--btn-withdraw-bg) !important; border-color: var(--btn-withdraw-border) !important; color: var(--btn-withdraw-text) !important; }
+
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes pop { 0% { transform: scale(0.96); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen select-none">
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+    <header class="header-custom p-4 flex items-center shadow-sm sticky top-0 z-50 border-b border-gray-100">
+        <i class="fas fa-arrow-left text-xl mr-4 cursor-pointer text-gray-600 active:scale-90 transition-transform" onclick="location.href='home.html'"></i>
+        <h1 class="font-bold text-lg text-gray-800 tracking-tight">My Smart Wallet</h1>
+    </header>
+
+    <main class="flex-1 p-5 max-w-md mx-auto w-full pb-20">
+        
+        <div id="balanceCard" class="wallet-card rounded-[2.5rem] py-6 px-7 text-white mb-8 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full mix-blend-overlay filter blur-3xl opacity-50 pointer-events-none"></div>
+
+            <div class="relative z-10">
+                <div class="flex justify-between items-center mb-2">
+                    <p id="balanceLabel" class="text-[10px] text-white/80 uppercase tracking-[0.2em] font-black">Net Wallet Balance</p>
+                    <div id="statusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-100 border border-emerald-400/30 shadow-sm">
+                        <span class="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Syncing
+                    </div>
+                </div>
+                
+                <h2 id="balanceAmount" class="text-[2.5rem] leading-none font-extrabold mb-6 tracking-tight drop-shadow-md">Rs. 0</h2>
+                
+                <div id="actionButtons" class="hidden mt-4 gap-3 transition-all duration-300">
+                    <button id="btnTopUp" onclick="location.href='top-up.html'" class="btn-topup flex-1 active:scale-[0.98] py-3 rounded-2xl text-[12px] font-bold uppercase tracking-wider shadow-lg transition-all duration-200 flex items-center justify-center">
+                        <i class="fas fa-plus-circle mr-2"></i> Top-Up
+                    </button>
+                    <button id="btnWithdraw" onclick="location.href='withdraw.html'" class="btn-withdraw flex-1 active:scale-[0.98] py-3 rounded-2xl text-[12px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md transition-all duration-200 items-center justify-center">
+                        <i class="fas fa-arrow-up-right-from-square mr-2 opacity-80"></i> Withdraw
+                    </button>
+                </div>
+            </div>
+            <i class="fas fa-wallet absolute -right-6 -bottom-8 text-white/5 text-[12rem] rotate-[-15deg] pointer-events-none"></i>
+        </div>
+
+        <div class="flex justify-between items-end mb-4 px-2">
+            <div>
+                <h3 class="font-black text-slate-800 uppercase text-xs tracking-widest">Transaction History</h3>
+                <p class="text-[10px] text-slate-400 font-medium mt-1">Click transactions for overview preview</p>
+            </div>
+        </div>
+
+        <div id="transactionList" class="space-y-3 pb-10 px-1">
+            <div class="text-center py-12 text-slate-400 flex flex-col items-center justify-center">
+                <i class="fas fa-circle-notch fa-spin text-xl mb-3 text-blue-500"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Syncing Log...</span>
+            </div>
+        </div>
+    </main>
+
+    <div id="previewModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in" onclick="closeModal()">
+        <div class="bg-white w-full max-w-sm rounded-[2.2rem] p-6 shadow-2xl relative animate-pop max-h-[85vh] overflow-y-auto border border-gray-100" onclick="event.stopPropagation()">
+            <button onclick="closeModal()" class="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-gray-100 active:bg-gray-200 text-gray-500 rounded-full transition-colors">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+            <div id="modalContent" class="space-y-4 pt-2"></div>
+        </div>
+    </div>
+
+    <div id="fullImageOverlay" class="hidden fixed inset-0 bg-black/95 z-[300] flex items-center justify-center p-4 animate-fade-in" onclick="closeFullImagePreview()">
+        <button class="absolute top-5 right-5 text-white text-2xl w-10 h-10 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform">
+            <i class="fas fa-times"></i>
+        </button>
+        <img id="fullImageView" src="" class="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl animate-pop">
+    </div>
+
+    <div id="appNotificationModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-6 animate-fade-in" onclick="closeNotificationModal()">
+        <div class="bg-white w-full max-w-xs rounded-[2rem] p-5 shadow-2xl text-center animate-pop border border-slate-50" onclick="event.stopPropagation()">
+            <div id="notificationIconContainer" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl mb-3 shadow-sm"></div>
+            <h3 id="notificationTitle" class="font-black text-slate-800 text-sm uppercase tracking-wide">Notification</h3>
+            <p id="notificationMessage" class="text-xs text-slate-500 font-bold mt-2 leading-relaxed px-1">Details...</p>
+            <button onclick="closeNotificationModal()" class="w-full mt-4 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-md">
+                Acknowledge
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = "https://hkabhikizdlbavfkualt.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYWJoaWtpemRsYmF2Zmt1YWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0ODgyMjUsImV4cCI6MjA5MjA2NDIyNX0.iMlS6-M1aylW8K915LPYDHOg7qUxwu5GelH_CPHLP2U";
+        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+
+        const userPhone = (localStorage.getItem('faster_phone') || "").trim();
+        const customerId = localStorage.getItem('faster_customer_id') || '';
+
+        window.unifiedCache = [];
+        window.currentGlobalBalance = 0;
+        let isModalHistoryPushed = false; 
+
+        async function loadWalletData() {
+            if (!navigator.onLine || !userPhone) return;
+            try {
+                let currentBal = 0;
+                const { data: walletData } = await _supabase.from('wallets').select('current_balance').eq('customer_id', customerId).maybeSingle(); 
+                if (walletData) currentBal = parseFloat(walletData.current_balance || 0);
+                window.currentGlobalBalance = currentBal;
+
+                const { data: orders } = await _supabase.from('orders').select('*').eq('customer_id', customerId).in('status', ['completed', 'canceled', 'CANCELLED', 'cancelled']);
+                const { data: topups } = await _supabase.from('topup_requests').select('*').eq('customer_id', customerId);
+                const { data: withdraws } = await _supabase.from('withdraw_requests').select('*').eq('customer_id', customerId);
+
+                let tempTimeline = [];
+                if (orders) orders.forEach(o => tempTimeline.push({ ...o, txType: 'order', sortDate: o.updated_at || o.created_at }));
+                if (topups) topups.forEach(t => tempTimeline.push({ ...t, txType: 'topup', sortDate: t.created_at }));
+                if (withdraws) withdraws.forEach(w => tempTimeline.push({ ...w, txType: 'withdraw', sortDate: w.created_at }));
+
+                tempTimeline.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+                window.unifiedCache = tempTimeline;
+
+                if (!walletData && tempTimeline.filter(x => x.txType === 'order').length > 0) {
+                    currentBal = parseFloat(tempTimeline.filter(x => x.txType === 'order')[0].balance_amount || 0);
+                    window.currentGlobalBalance = currentBal;
+                }
+                updateBalanceUI(currentBal);
+                renderUnifiedTimeline(window.unifiedCache);
+            } catch (err) { console.error("Data Sync Engine Error:", err); }
+        }
+
+        function updateBalanceUI(bal) {
+            const amtEl = document.getElementById('balanceAmount');
+            const badge = document.getElementById('statusBadge');
+            const label = document.getElementById('balanceLabel');
+            const card = document.getElementById('balanceCard');
+            const withdrawBtn = document.getElementById('btnWithdraw');
+            const actionButtons = document.getElementById('actionButtons');
+
+            amtEl.innerText = `Rs. ${Math.abs(bal)}`;
+            
+            actionButtons.classList.remove('hidden');
+            actionButtons.classList.add('flex');
+
+            if (bal >= 0) {
+                withdrawBtn.classList.add('hidden');
+                withdrawBtn.classList.remove('flex');
+            } else {
+                withdrawBtn.classList.remove('hidden');
+                withdrawBtn.classList.add('flex');
+            }
+
+            card.style.background = "var(--card-static-bg)";
+
+            if (bal > 0) {
+                badge.innerHTML = `<span class="w-1.5 h-1.5 bg-red-300 rounded-full animate-pulse"></span> Pending Payment`;
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase bg-red-500/30 text-white border border-red-400/50 shadow-sm";
+                label.innerText = "You Owe Us";
+                amtEl.style.color = "var(--balance-text-owe)";
+            } else if (bal < 0) {
+                badge.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Advance Balance`;
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-500/30 text-white border border-emerald-400/50 shadow-sm";
+                label.innerText = "Your Remaining Credit";
+                amtEl.style.color = "var(--balance-text-advance)";
+            } else {
+                badge.innerHTML = `<span class="w-1.5 h-1.5 bg-blue-300 rounded-full"></span> All Clear`;
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase bg-white/10 text-white/80 border border-white/20 shadow-sm";
+                label.innerText = "Wallet Balance";
+                amtEl.style.color = "var(--balance-text-normal)";
+            }
+        }
+
+        function renderUnifiedTimeline(list) {
+            const container = document.getElementById('transactionList');
+            if (!list || list.length === 0) {
+                container.innerHTML = `<div class="text-center py-16 opacity-30 text-xs font-bold uppercase">No history yet</div>`;
+                return;
+            }
+
+            container.innerHTML = list.map((tx, idx) => {
+                let title = "";
+                let subtext = "";
+                let stateBadge = "";
+                
+                let cardBg = "var(--tx-generic-bg)";
+                let cardText = "var(--tx-generic-text)";
+                let cardBorder = "white"; // Fallback safe color
+
+                if (tx.txType === 'order') {
+                    const bal = parseFloat(tx.balance_amount || 0);
+                    const paid = parseFloat(tx.final_amount || 0);
+                    const totalPayable = parseFloat(tx.bill_amount || 0);
+                    title = `Order #${tx.id.toString().slice(-5)}`;
+                    subtext = new Date(tx.sortDate).toLocaleDateString();
+                    
+                    let isSettledViaTopUp = false;
+                    let isSettledViaRider = false;
+
+                    if (bal > 0 && window.currentGlobalBalance <= 0) {
+                        let clearedByRider = false;
+                        
+                        if (tx.settled_via === 'rider' || tx.cleared_by_rider === true) {
+                            clearedByRider = true;
+                        } else {
+                            const newerTransactions = list.slice(0, idx).reverse();
+                            const clearingTx = newerTransactions.find(t => 
+                                (t.txType === 'topup' && t.status === 'approved') || 
+                                (t.txType === 'order' && parseFloat(t.balance_amount || 0) <= 0)
+                            );
+
+                            if (clearingTx && clearingTx.txType === 'order') {
+                                clearedByRider = true;
+                            }
+                        }
+
+                        if (clearedByRider) {
+                            isSettledViaRider = true;
+                        } else {
+                            isSettledViaTopUp = true;
+                        }
+                    } 
+                    else if (bal === 0 && paid < totalPayable && totalPayable > 0) {
+                        isSettledViaTopUp = true;
+                    }
+
+                    if (isSettledViaRider) {
+                        stateBadge = `<span class="text-[11px] font-black text-teal-600 flex items-center gap-1">Settled via Rider <i class="fas fa-handshake"></i></span>`;
+                        cardBg = "var(--tx-rider-bg)";
+                        cardText = "var(--tx-rider-text)";
+                        cardBorder = "var(--tx-rider-border)";
+                    } else if (isSettledViaTopUp) {
+                        stateBadge = `<span class="text-[11px] font-black text-indigo-600 flex items-center gap-1">Settled via Top-Up <i class="fas fa-check-double"></i></span>`;
+                        cardBg = "var(--tx-topup-settled-bg)";
+                        cardText = "var(--tx-topup-settled-text)";
+                        cardBorder = "var(--tx-topup-settled-border)";
+                    } else if (bal === 0) {
+                        stateBadge = `<span class="text-[11px] font-black text-emerald-600 flex items-center gap-1">Settled <i class="fas fa-check-double"></i></span>`;
+                        cardBg = "var(--tx-settled-bg)";
+                        cardText = "var(--tx-settled-text)";
+                        cardBorder = "var(--tx-settled-border)";
+                    } else {
+                        stateBadge = `<span class="text-[11px] font-black ${bal > 0 ? 'text-red-600' : 'text-emerald-600'}">${bal > 0 ? 'Pending' : 'Advance'}: Rs. ${Math.abs(bal)}</span>`;
+                        cardBg = bal > 0 ? "var(--tx-pending-bg)" : "var(--tx-advance-bg)";
+                        cardText = bal > 0 ? "var(--tx-pending-text)" : "var(--tx-advance-text)";
+                        cardBorder = bal > 0 ? "var(--tx-pending-border)" : "var(--tx-advance-border)";
+                    }
+                } 
+                else if (tx.txType === 'topup') {
+                    title = `Top-Up Wallet`;
+                    const status = (tx.status || 'pending').toLowerCase();
+                    subtext = `${new Date(tx.sortDate).toLocaleDateString()} | ${status.toUpperCase()}`;
+                    cardBg = "var(--tx-generic-bg)";
+                    cardText = "var(--tx-generic-text)";
+
+                    if (status === 'approved') {
+                        stateBadge = `<span class="text-[11px] font-black text-emerald-600 flex items-center gap-1">Rs. ${tx.amount} <i class="fas fa-check-circle"></i></span>`;
+                        cardBorder = "var(--tx-border-topup-approved)";
+                    } else if (status === 'rejected') {
+                        stateBadge = `<span class="text-[11px] font-black text-red-600">Rs. ${tx.amount}</span>`;
+                        cardBorder = "var(--tx-border-topup-rejected)";
+                    } else {
+                        stateBadge = `<span class="text-[11px] font-black text-orange-600">Rs. ${tx.amount}</span>`;
+                        cardBorder = "var(--tx-border-topup-pending)";
+                    }
+                } 
+                else if (tx.txType === 'withdraw') {
+                    title = `Withdraw Funds`;
+                    const status = (tx.status || 'pending').toLowerCase();
+                    subtext = `${new Date(tx.sortDate).toLocaleDateString()} | ${status.toUpperCase()}`;
+                    stateBadge = `<span class="text-[11px] font-black text-red-600">Rs. ${tx.amount}</span>`;
+                    cardBg = "var(--tx-generic-bg)";
+                    cardText = "var(--tx-generic-text)";
+                    
+                    cardBorder = status === 'approved' ? "var(--tx-border-withdraw-approved)" : status === 'cancelled' ? "var(--tx-border-withdraw-rejected)" : "var(--tx-border-withdraw-pending)";
+                }
+
+                return `
+                    <div onclick="openPreviewModal(${idx})" style="background-color: ${cardBg}; border-left-color: ${cardBorder};" class="p-3 rounded-xl shadow-sm border border-gray-100 border-l-4 cursor-pointer hover:opacity-90 transition-all flex justify-between items-center active:scale-[0.99] animate-pop">
+                        <div>
+                            <h4 style="color: ${cardText};" class="font-black text-[11px] uppercase tracking-wide">${title}</h4>
+                            <p class="text-[8px] text-gray-400 font-bold mt-0.5">${subtext}</p>
+                        </div>
+                        <div class="text-right flex items-center gap-2 text-gray-300">
+                            ${stateBadge}
+                            <i class="fas fa-chevron-right text-[10px]"></i>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openPreviewModal(index) {
+            const modal = document.getElementById('previewModal');
+            const content = document.getElementById('modalContent');
+            const tx = window.unifiedCache[index];
+            let html = "";
+
+            document.body.classList.add('overflow-hidden');
+
+            if (!isModalHistoryPushed) {
+                history.pushState({ modalActive: true }, '');
+                isModalHistoryPushed = true;
+            }
+
+            if (tx.txType === 'order') {
+                const bal = parseFloat(tx.balance_amount || 0);
+                const itemPlusDc = (parseFloat(tx.item_price) || 0) + (parseFloat(tx.dc_amount) || 0);
+                const totalPayable = parseFloat(tx.bill_amount) || 0;
+                const paid = parseFloat(tx.final_amount || 0);
+
+                let isSettledViaTopUp = false;
+                let isSettledViaRider = false;
+
+                if (bal > 0 && window.currentGlobalBalance <= 0) {
+                    let clearedByRider = false;
+                    
+                    if (tx.settled_via === 'rider' || tx.cleared_by_rider === true) {
+                        clearedByRider = true;
+                    } else {
+                        const newerTransactions = window.unifiedCache.slice(0, index).reverse();
+                        const clearingTx = newerTransactions.find(t => 
+                            (t.txType === 'topup' && t.status === 'approved') || 
+                            (t.txType === 'order' && parseFloat(t.balance_amount || 0) <= 0)
+                        );
+                        if (clearingTx && clearingTx.txType === 'order') {
+                            clearedByRider = true;
+                        }
+                    }
+
+                    if (clearedByRider) {
+                        isSettledViaRider = true;
+                    } else {
+                        isSettledViaTopUp = true;
+                    }
+                } 
+                else if (bal === 0 && paid < totalPayable && totalPayable > 0) {
+                    isSettledViaTopUp = true;
+                }
+
+                let stateHtml = "";
+                let originalPendingLayout = "";
+                
+                // 📦 1. ORDER KE LIYE DYNAMIC ICONS & COLORS
+                let orderIconHtml = "";
+
+                if (isSettledViaRider) {
+                    stateHtml = `<span class="text-teal-600 font-black text-xs flex items-center gap-1">Settled via Rider <i class="fas fa-motorcycle"></i></span>`;
+                    orderIconHtml = `<div class="w-12 h-12 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-teal-200"><i class="fas fa-handshake"></i></div>`;
+                    originalPendingLayout = `
+                        <div class="flex justify-between border-b border-slate-100 pb-1.5 text-red-500 font-bold">
+                            <span>Pending Amount:</span>
+                            <span>Rs. ${totalPayable - paid}</span>
+                        </div>
+                        <div class="p-3 bg-teal-50 rounded-xl border border-teal-100 mt-2 shadow-sm">
+                            <span class="text-teal-800 font-black text-[9px] uppercase block mb-0.5">Settlement Info:</span>
+                            <p class="text-teal-900 text-[11px] font-bold leading-tight"><i class="fas fa-handshake mr-1 text-teal-600"></i> This pending amount was successfully cleared by paying the rider in a subsequent order.</p>
+                        </div>
+                    `;
+                } else if (isSettledViaTopUp) {
+                    stateHtml = `<span class="text-indigo-600 font-black text-xs flex items-center gap-1">Settled via Top-Up <i class="fas fa-check-double"></i></span>`;
+                    orderIconHtml = `<div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-indigo-200"><i class="fas fa-wallet"></i></div>`;
+                    originalPendingLayout = `
+                        <div class="flex justify-between border-b border-slate-100 pb-1.5 text-red-500 font-bold">
+                            <span>Pending Amount:</span>
+                            <span>Rs. ${totalPayable - paid}</span>
+                        </div>
+                        <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-100 mt-2 shadow-sm">
+                            <span class="text-indigo-800 font-black text-[9px] uppercase block mb-0.5">Settlement Info:</span>
+                            <p class="text-indigo-900 text-[11px] font-bold leading-tight"><i class="fas fa-wallet mr-1 text-indigo-600"></i> This order was previously pending but has been successfully cleared using your wallet Top-Up balance.</p>
+                        </div>
+                    `;
+                } else if (bal === 0) {
+                    stateHtml = `<span class="text-emerald-600 font-black text-xs flex items-center gap-1">Settled <i class="fas fa-check-double"></i></span>`;
+                    orderIconHtml = `<div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-emerald-200"><i class="fas fa-circle-check"></i></div>`;
+                } else if (bal > 0) {
+                    stateHtml = `<span class="text-red-600 font-black text-xs">Pending Amount: Rs. ${Math.abs(bal)}</span>`;
+                    orderIconHtml = `<div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-red-200"><i class="fas fa-clock"></i></div>`;
+                } else {
+                    stateHtml = `<span class="text-emerald-600 font-black text-xs">Remaining Amount: Rs. ${Math.abs(bal)}</span>`;
+                    orderIconHtml = `<div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-emerald-200"><i class="fas fa-coins"></i></div>`;
+                }
+
+                html = `
+                    <div class="text-center border-b border-slate-100 pb-3">
+                        ${orderIconHtml}
+                        <h3 class="font-black text-gray-800 text-sm uppercase tracking-wide">Order Overview</h3>
+                        <p class="text-[9px] text-gray-400 font-bold mt-0.5">ID: #${tx.id}</p>
+                    </div>
+                    <div class="space-y-2.5 pt-2 text-xs">
+                        <div class="flex justify-between border-b pb-1.5">
+                            <span class="text-gray-400 font-bold">Time & date:</span>
+                            <span class="font-bold text-gray-600">${new Date(tx.sortDate).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-1.5">
+                            <span class="text-gray-400 font-bold">Rider Name:</span>
+                            <span class="font-bold text-gray-700">${tx.rider_name || 'Not Assigned'}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-1.5">
+                            <span class="text-gray-400 font-bold">Rider Phone:</span>
+                            <span class="font-bold text-gray-700">${tx.rider_phone || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-1.5">
+                            <span class="text-gray-400 font-bold">Rider ID:</span>
+                            <span class="font-bold text-gray-700">${tx.rider_id || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-1.5">
+                            <span class="text-gray-400 font-bold">Items & DC Subtotal:</span>
+                            <span class="font-bold text-gray-800">Rs. ${itemPlusDc}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-1.5 font-black text-slate-800 text-xs">
+                            <span>Total Bill Payable:</span>
+                            <span>Rs. ${totalPayable}</span>
+                        </div>
+                        <div class="flex justify-between bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl text-slate-700 font-black items-center">
+                            <span class="flex items-center gap-1.5"><i class="fas fa-hand-holding-dollar text-slate-400 text-sm"></i> Paid To Rider:</span>
+                            <span class="text-xs text-slate-900">Rs. ${paid}</span>
+                        </div>
+                        ${originalPendingLayout}
+                        <div class="flex justify-between border-t border-slate-100 pt-2 items-center">
+                            <span class="text-gray-500 font-black uppercase text-[9px]">Status:</span>
+                            ${stateHtml}
+                        </div>
+                    </div>
+                `;
+            } 
+            else if (tx.txType === 'topup') {
+                const status = (tx.status || 'pending').toLowerCase();
+                
+                // 💰 2. TOP-UP KE LIYE DYNAMIC ICONS & COLORS
+                let topupIconHtml = "";
+                if (status === 'approved') {
+                    topupIconHtml = `<div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-emerald-200"><i class="fas fa-circle-check"></i></div>`;
+                } else if (status === 'rejected') {
+                    topupIconHtml = `<div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-red-200"><i class="fas fa-circle-xmark"></i></div>`;
+                } else {
+                    topupIconHtml = `<div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-orange-200"><i class="fas fa-hourglass-half animate-pulse"></i></div>`;
+                }
+
+                html = `
+                    <div class="text-center border-b border-slate-100 pb-3">
+                        ${topupIconHtml}
+                        <h3 class="font-black text-gray-800 text-sm uppercase tracking-wide">Top-Up Overview</h3>
+                    </div>
+                    <div class="space-y-3 pt-2 text-xs">
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Top-Up Amount:</span>
+                            <span class="font-black text-emerald-600">Rs. ${tx.amount}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Status:</span>
+                            <span class="font-black uppercase ${status === 'approved' ? 'text-emerald-600' : status === 'rejected' ? 'text-red-500' : 'text-orange-500'}">${tx.status || 'pending'}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Time & date:</span>
+                            <span class="font-bold text-gray-600">${new Date(tx.sortDate).toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 font-bold block mb-1">Reference Snapshot Detail:</span>
+                            <p class="bg-slate-50 p-3 rounded-xl italic text-gray-600 text-[11px] border border-slate-100 break-words">${tx.bank_snapshot || 'Direct Deposit'}</p>
+                        </div>
+                    </div>
+                `;
+            } 
+            else if (tx.txType === 'withdraw') {
+                const status = (tx.status || 'pending').toLowerCase();
+                
+                // 🏦 3. WITHDRAW KE LIYE DYNAMIC ICONS & COLORS
+                let withdrawIconHtml = "";
+                if (status === 'approved') {
+                    withdrawIconHtml = `<div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-emerald-200"><i class="fas fa-money-bill-wave"></i></div>`;
+                } else if (status === 'cancelled') {
+                    withdrawIconHtml = `<div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-red-200"><i class="fas fa-ban"></i></div>`;
+                } else {
+                    withdrawIconHtml = `<div class="w-12 h-12 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-sky-200"><i class="fas fa-circle-notch fa-spin"></i></div>`;
+                }
+
+                let adminApprovedHtml = "";
+                if (status === 'approved') {
+                    adminApprovedHtml = `
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Admin Ref ID:</span>
+                            <span class="font-black text-slate-800">${tx.admin_reference || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2 items-center">
+                            <span class="text-gray-400 font-bold">Transfer Snapshot:</span>
+                            ${tx.admin_snapshot_url ? `
+                                <img src="${tx.admin_snapshot_url}" style="width: 40px; height: 40px;" class="object-cover rounded-lg border border-slate-200 cursor-pointer active:scale-90 transition-transform shadow-sm" onclick="openFullImagePreview('${tx.admin_snapshot_url}')" alt="Receipt">
+                            ` : '<span class="font-bold text-gray-400 italic">No image available</span>'}
+                        </div>
+                    `;
+                }
+
+                html = `
+                    <div class="text-center border-b border-slate-100 pb-3">
+                        ${withdrawIconHtml}
+                        <h3 class="font-black text-gray-800 text-sm uppercase tracking-wide">Withdraw Overview</h3>
+                    </div>
+                    <div class="space-y-3 pt-2 text-xs">
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Withdraw Amount:</span>
+                            <span class="font-black text-red-600">Rs. ${tx.amount}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Status:</span>
+                            <span class="font-black uppercase ${status === 'approved' ? 'text-emerald-600' : status === 'cancelled' ? 'text-red-500' : 'text-sky-500'}">${tx.status || 'pending'}</span>
+                        </div>
+                        ${adminApprovedHtml}
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Bank Name:</span>
+                            <span class="font-black text-slate-800">${tx.bank_name}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Account Title:</span>
+                            <span class="font-bold text-slate-700">${tx.account_title}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Account Number:</span>
+                            <span class="font-bold text-slate-800 tracking-wider font-mono">${tx.account_number}</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-400 font-bold">Time & date:</span>
+                            <span class="font-bold text-gray-600">${new Date(tx.sortDate).toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            content.innerHTML = html;
+            modal.classList.remove('hidden');
+        }
+
+        function openFullImagePreview(url) {
+            document.getElementById('fullImageView').src = url;
+            document.getElementById('fullImageOverlay').classList.remove('hidden');
+        }
+
+        function closeFullImagePreview() {
+            document.getElementById('fullImageOverlay').classList.add('hidden');
+        }
+
+        function closeModal(fromPopState = false) {
+            document.getElementById('previewModal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            
+            if (!fromPopState && isModalHistoryPushed) {
+                isModalHistoryPushed = false;
+                if (history.state && history.state.modalActive) {
+                    history.back();
+                }
+            } else {
+                isModalHistoryPushed = false;
+            }
+        }
+        
+        window.addEventListener('popstate', () => {
+            if (document.getElementById('fullImageOverlay').classList.contains('hidden') === false) {
+                closeFullImagePreview();
+            }
+            if (document.getElementById('previewModal').classList.contains('hidden') === false) {
+                closeModal(true);
+            }
+        });
+
+        function triggerCustomNotification(title, message, statusType = 'info') {
+            const modal = document.getElementById('appNotificationModal');
+            const titleEl = document.getElementById('notificationTitle');
+            const msgEl = document.getElementById('notificationMessage');
+            const iconContainer = document.getElementById('notificationIconContainer');
+
+            titleEl.innerText = title;
+            msgEl.innerText = message;
+            document.body.classList.add('overflow-hidden');
+
+            if (title.includes('Approved') || statusType === 'success') {
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl mb-3 bg-emerald-100 text-emerald-600 shadow-sm";
+                iconContainer.innerHTML = `<i class="fas fa-check-circle"></i>`;
+            } else if (title.includes('Cancelled') || statusType === 'error') {
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl mb-3 bg-red-100 text-red-600 shadow-sm";
+                iconContainer.innerHTML = `<i class="fas fa-times-circle"></i>`;
+            } else {
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl mb-3 bg-blue-100 text-blue-600 shadow-sm";
+                iconContainer.innerHTML = `<i class="fas fa-bell"></i>`;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeNotificationModal() {
+            document.getElementById('appNotificationModal').classList.add('hidden');
+            if (document.getElementById('previewModal').classList.contains('hidden')) {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
+        function setupLiveSync() {
+            _supabase.channel('wallet-balance-tracker')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: `customer_id=eq.${customerId}` }, () => {
+                    loadWalletData(); 
+                }).subscribe();
+            _supabase.channel('topup-tracker')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'topup_requests', filter: `customer_id=eq.${customerId}` }, () => {
+                    loadWalletData(); 
+                }).subscribe();
+            _supabase.channel('withdraw-tracker')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'withdraw_requests', filter: `customer_id=eq.${customerId}` }, () => {
+                    loadWalletData(); 
+                }).subscribe();
+            _supabase.channel('customer-notifications')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `phone=eq.${userPhone}` }, (payload) => {
+                    if (payload.new) {
+                        triggerCustomNotification(payload.new.title, payload.new.message);
+                        loadWalletData(); 
+                    }
+                }).subscribe();
+        }
+
+        window.onload = () => {
+            loadWalletData();
+            setupLiveSync(); 
+        };
+    </script>
+
+    <script src="global-message-notify.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ur">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14508c">
+  <title>Faster Home Delivery | Order Online</title>
+  <link rel="stylesheet" href="customer-order.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">F</span><div><strong>FASTER</strong><small>HOME DELIVERY</small></div></div>
+    <a class="top-link" href="order-track.html">Track Order</a>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <span class="eyebrow">FAST • LOCAL • RELIABLE</span>
+      <h1>Apna order yahan place karein</h1>
+      <p>Order dene ya status check karne ke liye WhatsApp ki zaroorat nahi.</p>
+    </section>
+    <form id="orderForm" class="panel">
+      <div class="section-heading"><span class="step">1</span><div><h2>Order ki maloomat</h2><p>Batayein aapko kis qisam ki delivery chahiye.</p></div></div>
+      <div class="choice-grid">
+        <label class="choice"><input type="radio" name="order_type" value="Shopping" checked><span>🛒<b>Shopping</b><small>Grocery / market se saman</small></span></label>
+        <label class="choice"><input type="radio" name="order_type" value="Pickup"><span>🍔<b>Pickup</b><small>Restaurant / pharmacy pickup</small></span></label>
+      </div>
+      <label class="field"><span>Aapka naam *</span><input name="name" required maxlength="80" autocomplete="name" placeholder="Naam likhein"></label>
+      <label class="field"><span>Mobile number *</span><input name="phone" required inputmode="tel" maxlength="20" autocomplete="tel" placeholder="03XXXXXXXXX"></label>
+      <div class="two-col">
+        <label class="field"><span>City *</span><input name="city" required value="Lahore" maxlength="80"></label>
+        <label class="field"><span>Society / Area *</span><input name="area" required maxlength="100" placeholder="Society ya area"></label>
+      </div>
+      <label class="field"><span>Block / Street (optional)</span><input name="block" maxlength="100" placeholder="Block, street ya house number"></label>
+      <label class="field"><span>Complete delivery address *</span><textarea name="address" required maxlength="500" rows="2" placeholder="House number, street, landmark..."></textarea></label>
+      <label class="field"><span>Order details *</span><textarea name="details" required maxlength="3000" rows="5" placeholder="Misal: 2 kg aloo, 1 dozen anday...&#10;Ya restaurant/pharmacy ka naam aur items likhein."></textarea></label>
+      <p class="hint">Agar pickup order hai to restaurant ya pharmacy ka naam bhi likhein.</p>
+      <button id="submitBtn" class="primary" type="submit">Order Place Karein <span>→</span></button>
+      <p class="fineprint">Order submit karne par aapki di hui maloomat delivery ke liye Faster team ko bheji jayegi.</p>
+      <div id="formMessage" class="message" role="status" aria-live="polite"></div>
+    </form>
+    <section id="successPanel" class="panel success-panel" hidden>
+      <div class="success-icon">✓</div><h2>Order receive ho gaya!</h2>
+      <p>Apna Order ID sambhal kar rakhein. Isi se aap status check kar sakte hain.</p>
+      <div class="order-number" id="createdOrderId">—</div>
+      <a id="trackCreatedOrder" class="primary link-button" href="order-track.html">Order Status Dekhein →</a>
+      <button id="newOrderBtn" class="secondary" type="button">Naya order place karein</button>
+    </section>
+    <footer>© Faster Home Delivery · Customer Order Portal</footer>
+  </main>
+  <script src="customer-order.js"></script>
+</body>
+</html>

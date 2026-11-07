@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Faster - Completed Orders</title>
+    <link rel="icon" href="favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        
+        html, body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none;
+            -webkit-user-select: none;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .modal-enter { display: flex !important; animation: fadeIn 0.3s ease-out forwards; }
+        .modal-leave { animation: fadeOut 0.3s ease-in forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        .settled-badge { background: #ecfdf5; color: #059669; border: 1px solid #10b981; }
+    </style>
+</head>
+<body class="bg-gray-50 flex flex-col min-h-screen">
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+    <header class="bg-white p-4 flex items-center shadow-sm sticky top-0 z-50">
+        <i class="fas fa-arrow-left text-xl mr-4 cursor-pointer text-gray-600" onclick="location.href='home.html'"></i>
+        <h1 class="font-bold text-lg text-gray-800">Order History</h1>
+    </header>
+
+    <main id="ordersContainer" class="flex-1 p-5 space-y-4 pb-20">
+        <div id="loader" class="flex flex-col items-center justify-center py-20 opacity-30">
+            <i class="fas fa-circle-notch animate-spin text-3xl mb-4"></i>
+            <p class="text-xs font-bold uppercase tracking-widest">Fetching Records...</p>
+        </div>
+    </main>
+
+    <div id="billModal" class="hidden fixed inset-0 bg-black/60 z-[100] items-center justify-center p-6 backdrop-blur-sm">
+        <div id="billModalContent" class="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="font-black uppercase text-[10px] tracking-widest opacity-60">Order Summary</h3>
+                    <p class="text-base font-bold">Details & Receipt</p>
+                </div>
+                <button onclick="closeBillModal()" class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center active:scale-90 transition">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto p-5 space-y-5">
+                <div id="orderItemsSection">
+                    <p class="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Items Ordered:</p>
+                    <div id="itemsList" class="space-y-2">
+                        </div>
+                </div>
+
+                <div id="receiptPhotoContainer" class="hidden pt-2">
+                    <p class="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Rider Receipt:</p>
+                    <img id="receiptImg" src="" class="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-sm" onclick="window.open(this.src)">
+                </div>
+
+                <div id="modalBreakdown" class="pt-2"></div>
+            </div>
+
+            <button onclick="closeBillModal()" class="w-full py-4 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-[0.2em] hover:bg-gray-100 transition shrink-0">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = "https://hkabhikizdlbavfkualt.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYWJoaWtpemRsYmF2Zmt1YWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0ODgyMjUsImV4cCI6MjA5MjA2NDIyNX0.iMlS6-M1aylW8K915LPYDHOg7qUxwu5GelH_CPHLP2U";
+        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+        const customerId = localStorage.getItem('faster_customer_id') || '';
+
+        async function initPage() {
+            if (!customerId) { window.location.replace('index.html'); return; }
+            fetchCompletedOrders();
+        }
+
+        async function fetchCompletedOrders() {
+            try {
+                const { data: walletData } = await _supabase.from('wallets').select('current_balance').eq('customer_id', customerId).maybeSingle();
+                const currentWalletBal = walletData ? parseFloat(walletData.current_balance || 0) : 0;
+
+                const { data: orders, error } = await _supabase.from('orders').select('*').eq('customer_id', customerId).in('status', ['completed', 'canceled', 'CANCELLED', 'cancelled']).order('updated_at', { ascending: false });
+
+                if (error) throw error;
+                renderOrders(orders, currentWalletBal);
+            } catch (err) {
+                document.getElementById('ordersContainer').innerHTML = `<p class="text-center py-20 text-red-500 font-bold uppercase text-[10px]">Error Loading History</p>`;
+            }
+        }
+
+        function renderOrders(orders, liveWalletBal) {
+            const container = document.getElementById('ordersContainer');
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `<div class="text-center py-20 opacity-20 font-black uppercase text-xs">No History Found</div>`;
+                return;
+            }
+
+            container.innerHTML = orders.map(o => {
+                const balAmount = parseFloat(o.balance_amount || 0);
+                const orderIdShort = o.id.toString().slice(-6).toUpperCase();
+                
+                let statusBadge = '';
+                if (balAmount > 0) {
+                    if (liveWalletBal <= 0) {
+                        statusBadge = `<span class="px-3 py-1 settled-badge rounded-full text-[9px] font-black uppercase tracking-tighter"><i class="fas fa-check-double mr-1"></i> Settled</span>`;
+                    } else {
+                        statusBadge = `<span class="px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full text-[9px] font-black uppercase tracking-tighter">Pending</span>`;
+                    }
+                } else if (balAmount < 0) {
+                    statusBadge = `<span class="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[9px] font-black uppercase tracking-tighter">Advance</span>`;
+                } else {
+                    statusBadge = `<span class="px-3 py-1 bg-gray-100 text-gray-500 border border-gray-200 rounded-full text-[9px] font-black uppercase tracking-tighter">Paid</span>`;
+                }
+
+                return `
+                    <div onclick="showBillDetails('${o.id}')" class="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 animate-pop cursor-pointer active:scale-95 transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div><h3 class="font-black text-gray-800 text-sm">Order #${orderIdShort}</h3><p class="text-[10px] text-gray-400 font-bold">${new Date(o.updated_at).toLocaleDateString()}</p></div>
+                            ${statusBadge}
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div class="space-y-1"><p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Total Bill</p><p class="text-lg font-black text-slate-800">Rs. ${o.bill_amount}</p></div>
+                            <p class="text-[9px] text-blue-500 font-black uppercase underline">Details <i class="fas fa-chevron-right ml-1"></i></p>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function showBillDetails(id) {
+            const { data: o } = await _supabase.from('orders').select('*').eq('id', id).single();
+            if (!o) return;
+
+            const modal = document.getElementById('billModal');
+            
+            // ✅ 1. Items List Logic (Yahan add ki hai list)
+            const itemsContainer = document.getElementById('itemsList');
+            const detailsText = o.order_details || "No details available";
+            const items = detailsText.split(/[|\n]/).map(i => i.trim()).filter(i => i !== "");
+            
+            itemsContainer.innerHTML = items.map(item => `
+                <div class="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <i class="fas fa-shopping-basket text-orange-400 text-xs"></i>
+                    <span class="text-xs font-bold text-gray-700 leading-tight">${item}</span>
+                </div>
+            `).join('');
+
+            // ✅ 2. Receipt Image Logic
+            const receiptContainer = document.getElementById('receiptPhotoContainer');
+            const receiptImg = document.getElementById('receiptImg');
+            if (o.bill_image) {
+                receiptImg.src = o.bill_image;
+                receiptContainer.classList.remove('hidden');
+            } else {
+                receiptContainer.classList.add('hidden');
+            }
+
+            // ✅ 3. Breakdown Logic
+            const balNum = parseFloat(o.balance_amount || 0);
+            const { data: wallet } = await _supabase.from('wallets').select('current_balance').eq('customer_id', customerId).maybeSingle();
+            const liveBal = wallet ? parseFloat(wallet.current_balance || 0) : 0;
+
+            let finalStatusLabel = balNum > 0 ? (liveBal <= 0 ? "Settled via Top-up" : "Pending Payment") : "Payment Clear";
+            let finalStatusColor = balNum > 0 ? (liveBal <= 0 ? "text-emerald-600" : "text-red-600") : "text-gray-400";
+
+            let breakdownHTML = `
+                <div class="space-y-3 pt-2 border-t border-gray-100">
+                    <div class="flex justify-between text-sm font-bold text-gray-600"><span>Items + DC:</span><span class="text-gray-900">Rs. ${parseFloat(o.item_price||0) + parseFloat(o.dc_amount||0)}</span></div>
+                    ${o.previous_due ? `<div class="flex justify-between text-sm font-bold text-orange-500 bg-orange-50 p-2 rounded-lg"><span>Old Dues:</span><span>+ Rs. ${o.previous_due}</span></div>` : ''}
+                    <div class="pt-2 border-t border-dashed border-gray-200 flex justify-between items-center"><span class="font-black text-gray-800 uppercase text-[10px]">Total Bill:</span><span class="font-black text-lg text-slate-900">Rs. ${o.bill_amount}</span></div>
+                    <div class="flex justify-between text-sm font-bold text-blue-600 bg-blue-50 p-3 rounded-2xl"><span>Cash Paid To Rider:</span><span>Rs. ${o.final_amount || 0}</span></div>
+                    <div class="mt-2 pt-3 border-t border-gray-100 flex justify-between items-center text-[10px] font-black">
+                        <span class="text-gray-500 uppercase tracking-wide">${finalStatusLabel}</span>
+                        <span class="${finalStatusColor}">Rs. ${Math.abs(balNum)}</span>
+                    </div>
+                </div>`;
+            
+            document.getElementById('modalBreakdown').innerHTML = breakdownHTML;
+            modal.classList.replace('hidden', 'modal-enter');
+        }
+
+        function closeBillModal() {
+            const modal = document.getElementById('billModal');
+            modal.classList.add('modal-leave');
+            setTimeout(() => { modal.classList.replace('modal-leave', 'hidden'); modal.classList.remove('modal-enter'); }, 300);
+        }
+
+        window.onload = initPage;
+    </script>
+
+    <script src="global-message-notify.js"></script>
+</body>
+</html>

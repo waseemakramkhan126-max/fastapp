@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Faster · My Profile</title>
+    <link rel="icon" href="favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --brand: #2CA9C9;
+            --brand-dark: #1D7A93;
+            --brand-light: #E0F4F9;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e7eaf0;
+            --page-bg: #ffffff;
+            --card-bg: rgba(255,255,255,0.85);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --ink: #f1f5f9;
+                --muted: #94a3b8;
+                --line: #223041;
+                --page-bg: #0f1720;
+                --card-bg: rgba(22, 32, 43, 0.9);
+            }
+        }
+
+        * { -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--page-bg);
+            color: var(--ink);
+        }
+
+        .app-header {
+            background: var(--card-bg);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--line);
+        }
+        .back-btn {
+            background: #fff;
+            border: 1px solid var(--line);
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+            transition: all 0.15s;
+        }
+        .back-btn:active { transform: scale(0.94); background: #f1f5f9; }
+
+        .avatar-ring {
+            background: linear-gradient(135deg, #2CA9C9, #1D7A93);
+            box-shadow: 0 12px 24px -8px rgba(44,169,201,0.45);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .avatar-ring:active { transform: scale(0.96); }
+        .avatar-ring .overlay-icon {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: white;
+        }
+
+        .profile-card {
+            background: var(--card-bg);
+            border-radius: 26px;
+            border: 1px solid var(--line);
+            box-shadow: 0 1px 2px rgba(15,23,42,0.03), 0 18px 40px -16px rgba(15,23,42,0.08);
+        }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+
+        .field-group {
+            background: #f8fafc;
+            border: 1.5px solid var(--line);
+            border-radius: 12px;
+            padding: 10px 12px;
+            transition: all 0.18s;
+        }
+        .field-group:focus-within {
+            background: var(--card-bg);
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(44,169,201,0.10);
+        }
+        .field-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: #eef2f9;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: all 0.18s;
+        }
+        .field-group:focus-within .field-icon {
+            background: var(--brand-light);
+            color: var(--brand);
+        }
+
+        .dropdown-btn {
+            background: #f8fafc;
+            border: 1.5px solid var(--line);
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.18s;
+            overflow: hidden;
+        }
+        .dropdown-btn:active { background: #f1f5f9; }
+        .dropdown-btn.is-filled { border-color: #cbd5e1; }
+        .dropdown-btn .display-text {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+        .chevron-wrap {
+            width: 24px;
+            height: 24px;
+            border-radius: 7px;
+            background: #eef2f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .dual-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .map-btn {
+            background: var(--brand-light);
+            color: var(--brand);
+            border: 1px solid #bfdbfe;
+            border-radius: 9px;
+            padding: 5px 10px;
+            font-weight: 700;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.18s;
+        }
+        .map-btn:active { background: #dbeafe; transform: scale(0.96); }
+        .pin-saved {
+            background: #ecfdf5 !important;
+            color: #059669 !important;
+            border-color: #a7f3d0 !important;
+        }
+
+        .hint-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #2CA9C9, #1D7A93);
+            box-shadow: 0 14px 28px -10px rgba(44,169,201,0.5);
+            transition: all 0.18s;
+            padding: 14px 20px;
+        }
+        .save-btn:active { transform: scale(0.985); box-shadow: 0 8px 16px -8px rgba(44,169,201,0.4); }
+        .save-btn:disabled { opacity: 0.85; }
+
+        .divider { height: 1px; background: var(--line); margin: 2px 0; }
+
+        .modal-overlay {
+            background: rgba(15,23,42,0.55);
+            backdrop-filter: blur(6px);
+        }
+        .list-item {
+            transition: background 0.15s;
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .list-item:active { background: #f1f5f9; }
+
+        .map-leave { transform: translateY(100%); opacity: 0; pointer-events: none; }
+        .map-enter { transform: translateY(0); opacity: 1; pointer-events: auto; }
+        .center-pin {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            z-index: 1000;
+            pointer-events: none;
+            filter: drop-shadow(0 8px 8px rgba(0,0,0,0.25));
+        }
+        .locate-fab {
+            background: #fff;
+            box-shadow: 0 10px 24px -6px rgba(15,23,42,0.25);
+        }
+        .locate-fab:active { transform: scale(0.93); }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up { animation: slideUp 0.25s ease-out; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+    <!-- Header -->
+    <header class="app-header sticky top-0 z-30 px-4 py-3 flex items-center gap-3">
+        <button onclick="history.back()" class="back-btn w-9 h-9 rounded-full flex items-center justify-center">
+            <i class="fas fa-arrow-left text-gray-700 text-sm"></i>
+        </button>
+        <h1 class="text-lg font-extrabold text-gray-900 tracking-tight">My <span class="text-blue-600">Profile</span></h1>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-md w-full mx-auto px-4 py-4">
+
+        <!-- Avatar block -->
+        <div class="flex flex-col items-center mb-4">
+            <div class="avatar-ring w-16 h-16 rounded-full flex items-center justify-center mb-2 relative" onclick="handleAvatarClick()">
+                <img id="avatarImg" src="" alt="Profile" class="w-full h-full object-cover rounded-full" style="display:none;">
+                <i id="avatarPlaceholder" class="fas fa-user text-white text-xl absolute inset-0 flex items-center justify-center"></i>
+                <div class="overlay-icon" onclick="event.stopPropagation(); document.getElementById('avatarInput').click()">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="previewAvatar(event)">
+            </div>
+            <p class="text-xs font-bold text-gray-400">Manage your account details</p>
+        </div>
+
+        <!-- Profile Card -->
+        <div class="profile-card p-4 space-y-3">
+
+            <!-- Full Name -->
+            <div>
+                <label class="section-label ml-1 mb-1 block">Full Name</label>
+                <div class="field-group flex items-center gap-2">
+                    <div class="field-icon"><i class="fas fa-user"></i></div>
+                    <input type="text" id="nameInput" placeholder="Enter your full name" class="w-full bg-transparent font-semibold text-gray-800 placeholder-gray-300 outline-none text-sm">
+                </div>
+            </div>
+
+            <!-- Phone -->
+            <div>
+                <label class="section-label ml-1 mb-1 block">Phone Number</label>
+                <div class="field-group flex items-center gap-2">
+                    <div class="field-icon"><i class="fas fa-phone"></i></div>
+                    <input type="tel" id="phoneInput" placeholder="03XX-XXXXXXX" class="w-full bg-transparent font-semibold text-gray-800 placeholder-gray-300 outline-none text-sm">
+                </div>
+            </div>
+
+            <!-- City + Area side by side -->
+            <div class="dual-col">
+                <div>
+                    <label class="section-label ml-1 mb-1 block">Select City</label>
+                    <div onclick="openCityModal()" class="dropdown-btn">
+                        <span id="cityDisplay" class="display-text text-gray-500 text-sm">Select city</span>
+                        <div class="chevron-wrap"><i class="fas fa-chevron-down"></i></div>
+                    </div>
+                </div>
+                <div>
+                    <label class="section-label ml-1 mb-1 block">Select Area</label>
+                    <div onclick="openAreaModal()" class="dropdown-btn">
+                        <span id="areaDisplay" class="display-text text-gray-500 text-sm">Select area</span>
+                        <div class="chevron-wrap"><i class="fas fa-chevron-down"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivery Address -->
+            <div>
+                <div class="flex items-end justify-between ml-1 mb-1">
+                    <label class="section-label">Delivery Address</label>
+                    <button onclick="openMapModal()" id="locBtn" class="map-btn">
+                        <i class="fas fa-map-marked-alt text-xs"></i> Pick on Map
+                    </button>
+                </div>
+                <div class="field-group">
+                    <textarea id="addressInput" rows="2" placeholder="House #, Street, Area..." class="w-full bg-transparent font-semibold text-gray-800 placeholder-gray-300 outline-none resize-none text-sm"></textarea>
+                </div>
+                <p class="hint-row ml-1 mt-1">
+                    <i class="fas fa-info-circle text-blue-400 text-xs"></i> Set pin to help rider find you.
+                </p>
+            </div>
+
+            <!-- Block (conditional) -->
+            <div id="blockInputContainer" style="display: none;">
+                <label class="section-label ml-1 mb-1 block">
+                    Block Name <span class="text-gray-300 font-medium">(optional)</span>
+                </label>
+                <div class="field-group flex items-center gap-2">
+                    <div class="field-icon"><i class="fas fa-map-pin"></i></div>
+                    <input type="text" id="blockInput" placeholder="e.g. A" class="w-full bg-transparent font-semibold text-gray-800 placeholder-gray-300 outline-none text-sm">
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <button onclick="updateProfile()" id="saveBtn" class="save-btn w-full text-white font-extrabold rounded-xl flex items-center justify-center gap-2 mt-1">
+                <i id="btnIcon" class="fas fa-check-circle"></i>
+                <span id="btnText">SAVE CHANGES</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- City/Area Selection Modal -->
+    <div id="selectionModal" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center modal-overlay">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[70vh] flex flex-col animate-slide-up">
+            <div class="flex items-center justify-between mb-3">
+                <button onclick="closeSelectionModal()" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+                <h2 id="modalTitle" class="text-lg font-extrabold text-gray-900">Select City</h2>
+                <div class="w-8"></div>
+            </div>
+            <div id="modalList" class="overflow-y-auto flex-1 space-y-1"></div>
+        </div>
+    </div>
+
+    <!-- Map Modal -->
+    <div id="mapModal" class="map-leave fixed inset-0 z-50 bg-white flex flex-col transition-all duration-300">
+        <div class="bg-white p-4 shadow-md flex justify-between items-center z-10 shrink-0">
+            <h2 class="font-extrabold text-gray-900"><i class="fas fa-map-marker-alt text-red-500 mr-2"></i> Set Exact Location</h2>
+            <button onclick="closeMapModal()" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-times text-gray-600"></i>
+            </button>
+        </div>
+        <div class="relative flex-1 bg-gray-200">
+            <div id="map" class="w-full h-full"></div>
+            <div class="center-pin text-red-500 text-[40px]">
+                <i class="fas fa-map-pin"></i>
+            </div>
+            <button onclick="locateMe()" class="locate-fab absolute bottom-6 right-4 z-[1000] w-12 h-12 rounded-full flex items-center justify-center text-blue-600">
+                <i class="fas fa-crosshairs text-xl"></i>
+            </button>
+        </div>
+        <div class="p-6 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-t-3xl z-10">
+            <p class="text-xs text-gray-400 font-bold uppercase tracking-widest text-center mb-3">Drag map to adjust pin</p>
+            <button onclick="confirmLocation()" id="confirmLocBtn" class="w-full bg-blue-600 text-white font-extrabold h-14 rounded-2xl flex items-center justify-center gap-2">
+                <i class="fas fa-check-circle"></i> Confirm Pin
+            </button>
+        </div>
+    </div>
+
+    <!-- Avatar Preview Modal -->
+    <div id="avatarPreviewModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-90" onclick="closeAvatarPreview()">
+        <img id="avatarPreviewImg" src="" class="max-w-[90%] max-h-[80vh] object-contain rounded-lg" onclick="event.stopPropagation()">
+        <button onclick="closeAvatarPreview()" class="absolute top-6 right-6 text-white text-2xl bg-white/20 rounded-full w-10 h-10 flex items-center justify-center">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="r2-upload.js"></script>
+    <script>
+        const _supabase = supabase.createClient(
+            "https://hkabhikizdlbavfkualt.supabase.co",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYWJoaWtpemRsYmF2Zmt1YWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0ODgyMjUsImV4cCI6MjA5MjA2NDIyNX0.iMlS6-M1aylW8K915LPYDHOg7qUxwu5GelH_CPHLP2U"
+        );
+
+        let userEmail = "";
+        let originalPhone = "";
+        let map;
+        let exactLatLng = "";
+        let citiesList = [];
+        let currentAreas = [];
+        let selectedCity = null;
+        let selectedArea = null;
+        let newAvatarFile = null;
+
+        // --- Avatar functions ---
+        function previewAvatar(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            newAvatarFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('avatarImg').src = e.target.result;
+                document.getElementById('avatarImg').style.display = 'block';
+                document.getElementById('avatarPlaceholder').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleAvatarClick() {
+            const img = document.getElementById('avatarImg');
+            if (img.style.display !== 'none' && img.src && img.src.trim() !== '') {
+                openAvatarPreview(img.src);
+            } else {
+                document.getElementById('avatarInput').click();
+            }
+        }
+
+        function openAvatarPreview(src) {
+            document.getElementById('avatarPreviewImg').src = src;
+            document.getElementById('avatarPreviewModal').classList.remove('hidden');
+            document.getElementById('avatarPreviewModal').classList.add('flex');
+        }
+
+        function closeAvatarPreview() {
+            document.getElementById('avatarPreviewModal').classList.add('hidden');
+            document.getElementById('avatarPreviewModal').classList.remove('flex');
+        }
+
+        // Simple MD5 (for Gravatar)
+        function md5(string) {
+            function rotateLeft(lValue, iShiftBits) {
+                return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
+            }
+            function addUnsigned(lX, lY) {
+                let lX4, lY4, lX8, lY8, lResult;
+                lX8 = (lX & 0x80000000);
+                lY8 = (lY & 0x80000000);
+                lX4 = (lX & 0x40000000);
+                lY4 = (lY & 0x40000000);
+                lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF);
+                if (lX4 & lY4) return lResult ^ 0x80000000 ^ lX8 ^ lY8;
+                if (lX4 | lY4) {
+                    if (lResult & 0x40000000) return lResult ^ 0xC0000000 ^ lX8 ^ lY8;
+                    else return lResult ^ 0x40000000 ^ lX8 ^ lY8;
+                } else return lResult ^ lX8 ^ lY8;
+            }
+            function f(x, y, z) { return (x & y) | ((~x) & z); }
+            function g(x, y, z) { return (x & z) | (y & (~z)); }
+            function h(x, y, z) { return (x ^ y ^ z); }
+            function i(x, y, z) { return (y ^ (x | (~z))); }
+            function ff(a, b, c, d, x, s, ac) {
+                a = addUnsigned(a, addUnsigned(addUnsigned(f(b, c, d), x), ac));
+                return addUnsigned(rotateLeft(a, s), b);
+            }
+            function gg(a, b, c, d, x, s, ac) {
+                a = addUnsigned(a, addUnsigned(addUnsigned(g(b, c, d), x), ac));
+                return addUnsigned(rotateLeft(a, s), b);
+            }
+            function hh(a, b, c, d, x, s, ac) {
+                a = addUnsigned(a, addUnsigned(addUnsigned(h(b, c, d), x), ac));
+                return addUnsigned(rotateLeft(a, s), b);
+            }
+            function ii(a, b, c, d, x, s, ac) {
+                a = addUnsigned(a, addUnsigned(addUnsigned(i(b, c, d), x), ac));
+                return addUnsigned(rotateLeft(a, s), b);
+            }
+            function convertToWordArray(str) {
+                let lWordCount;
+                let lMessageLength = str.length;
+                let lNumberOfWords_temp1 = lMessageLength + 8;
+                let lNumberOfWords_temp2 = (lNumberOfWords_temp1 - (lNumberOfWords_temp1 % 64)) / 64;
+                let lNumberOfWords = (lNumberOfWords_temp2 + 1) * 16;
+                let lWordArray = new Array(lNumberOfWords - 1);
+                let lBytePosition = 0;
+                let lByteCount = 0;
+                while (lByteCount < lMessageLength) {
+                    lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+                    lBytePosition = (lByteCount % 4) * 8;
+                    lWordArray[lWordCount] = (lWordArray[lWordCount] | (str.charCodeAt(lByteCount) << lBytePosition));
+                    lByteCount++;
+                }
+                lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+                lBytePosition = (lByteCount % 4) * 8;
+                lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition);
+                lWordArray[lNumberOfWords - 2] = lMessageLength << 3;
+                lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29;
+                return lWordArray;
+            }
+            function wordToHex(lValue) {
+                let wordToHexValue = "", wordToHexValue_temp = "", lByte, lCount;
+                for (lCount = 0; lCount <= 3; lCount++) {
+                    lByte = (lValue >>> (lCount * 8)) & 255;
+                    wordToHexValue_temp = "0" + lByte.toString(16);
+                    wordToHexValue = wordToHexValue + wordToHexValue_temp.substr(wordToHexValue_temp.length - 2, 2);
+                }
+                return wordToHexValue;
+            }
+            let x = [];
+            let k, AA, BB, CC, DD, a, b, c, d;
+            let S11 = 7, S12 = 12, S13 = 17, S14 = 22;
+            let S21 = 5, S22 = 9, S23 = 14, S24 = 20;
+            let S31 = 4, S32 = 11, S33 = 16, S34 = 23;
+            let S41 = 6, S42 = 10, S43 = 15, S44 = 21;
+            string = unescape(encodeURIComponent(string));
+            x = convertToWordArray(string);
+            a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
+            for (k = 0; k < x.length; k += 16) {
+                AA = a; BB = b; CC = c; DD = d;
+                a = ff(a, b, c, d, x[k + 0], S11, 0xD76AA478);
+                d = ff(d, a, b, c, x[k + 1], S12, 0xE8C7B756);
+                c = ff(c, d, a, b, x[k + 2], S13, 0x242070DB);
+                b = ff(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE);
+                a = ff(a, b, c, d, x[k + 4], S11, 0xF57C0FAF);
+                d = ff(d, a, b, c, x[k + 5], S12, 0x4787C62A);
+                c = ff(c, d, a, b, x[k + 6], S13, 0xA8304613);
+                b = ff(b, c, d, a, x[k + 7], S14, 0xFD469501);
+                a = ff(a, b, c, d, x[k + 8], S11, 0x698098D8);
+                d = ff(d, a, b, c, x[k + 9], S12, 0x8B44F7AF);
+                c = ff(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1);
+                b = ff(b, c, d, a, x[k + 11], S14, 0x895CD7BE);
+                a = ff(a, b, c, d, x[k + 12], S11, 0x6B901122);
+                d = ff(d, a, b, c, x[k + 13], S12, 0xFD987193);
+                c = ff(c, d, a, b, x[k + 14], S13, 0xA679438E);
+                b = ff(b, c, d, a, x[k + 15], S14, 0x49B40821);
+                a = gg(a, b, c, d, x[k + 1], S21, 0xF61E2562);
+                d = gg(d, a, b, c, x[k + 6], S22, 0xC040B340);
+                c = gg(c, d, a, b, x[k + 11], S23, 0x265E5A51);
+                b = gg(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA);
+                a = gg(a, b, c, d, x[k + 5], S21, 0xD62F105D);
+                d = gg(d, a, b, c, x[k + 10], S22, 0x2441453);
+                c = gg(c, d, a, b, x[k + 15], S23, 0xD8A1E681);
+                b = gg(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8);
+                a = gg(a, b, c, d, x[k + 9], S21, 0x21E1CDE6);
+                d = gg(d, a, b, c, x[k + 14], S22, 0xC33707D6);
+                c = gg(c, d, a, b, x[k + 3], S23, 0xF4D50D87);
+                b = gg(b, c, d, a, x[k + 8], S24, 0x455A14ED);
+                a = gg(a, b, c, d, x[k + 13], S21, 0xA9E3E905);
+                d = gg(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8);
+                c = gg(c, d, a, b, x[k + 7], S23, 0x676F02D9);
+                b = gg(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
+                a = hh(a, b, c, d, x[k + 5], S31, 0xFFFA3942);
+                d = hh(d, a, b, c, x[k + 8], S32, 0x8771F681);
+                c = hh(c, d, a, b, x[k + 11], S33, 0x6D9D6122);
+                b = hh(b, c, d, a, x[k + 14], S34, 0xFDE5380C);
+                a = hh(a, b, c, d, x[k + 1], S31, 0xA4BEEA44);
+                d = hh(d, a, b, c, x[k + 4], S32, 0x4BDECFA9);
+                c = hh(c, d, a, b, x[k + 7], S33, 0xF6BB4B60);
+                b = hh(b, c, d, a, x[k + 10], S34, 0xBEBFBC70);
+                a = hh(a, b, c, d, x[k + 13], S31, 0x289B7EC6);
+                d = hh(d, a, b, c, x[k + 0], S32, 0xEAA127FA);
+                c = hh(c, d, a, b, x[k + 3], S33, 0xD4EF3085);
+                b = hh(b, c, d, a, x[k + 6], S34, 0x4881D05);
+                a = hh(a, b, c, d, x[k + 9], S31, 0xD9D4D039);
+                d = hh(d, a, b, c, x[k + 12], S32, 0xE6DB99E5);
+                c = hh(c, d, a, b, x[k + 15], S33, 0x1FA27CF8);
+                b = hh(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
+                a = ii(a, b, c, d, x[k + 0], S41, 0xF4292244);
+                d = ii(d, a, b, c, x[k + 7], S42, 0x432AFF97);
+                c = ii(c, d, a, b, x[k + 14], S43, 0xAB9423A7);
+                b = ii(b, c, d, a, x[k + 5], S44, 0xFC93A039);
+                a = ii(a, b, c, d, x[k + 12], S41, 0x655B59C3);
+                d = ii(d, a, b, c, x[k + 3], S42, 0x8F0CCC92);
+                c = ii(c, d, a, b, x[k + 10], S43, 0xFFEFF47D);
+                b = ii(b, c, d, a, x[k + 1], S44, 0x85845DD1);
+                a = ii(a, b, c, d, x[k + 8], S41, 0x6FA87E4F);
+                d = ii(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0);
+                c = ii(c, d, a, b, x[k + 6], S43, 0xA3014314);
+                b = ii(b, c, d, a, x[k + 13], S44, 0x4E0811A1);
+                a = ii(a, b, c, d, x[k + 4], S41, 0xF7537E82);
+                d = ii(d, a, b, c, x[k + 11], S42, 0xBD3AF235);
+                c = ii(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB);
+                b = ii(b, c, d, a, x[k + 9], S44, 0xEB86D391);
+                a = addUnsigned(a, AA); b = addUnsigned(b, BB); c = addUnsigned(c, CC); d = addUnsigned(d, DD);
+            }
+            return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
+        }
+
+        // Fetch active cities & areas + has_blocks
+        async function loadDeliveryData() {
+            const { data, error } = await _supabase
+                .from('delivery_areas')
+                .select('city, area_name, has_blocks')
+                .eq('is_active', true);
+            if (error) { console.error(error); return; }
+            const citySet = new Set();
+            const cityAreaMap = new Map();
+            const areaHasBlocksMap = new Map();
+            data.forEach(row => {
+                const c = row.city.trim();
+                const a = row.area_name.trim();
+                citySet.add(c);
+                if (!cityAreaMap.has(c)) cityAreaMap.set(c, []);
+                cityAreaMap.get(c).push(a);
+                areaHasBlocksMap.set(a, row.has_blocks);
+            });
+            citiesList = Array.from(citySet).sort();
+            window.cityAreaMap = cityAreaMap;
+            window.areaHasBlocksMap = areaHasBlocksMap;
+        }
+
+        function updateBlockVisibility(areaName) {
+            const blockContainer = document.getElementById('blockInputContainer');
+            if (!areaName) {
+                blockContainer.style.display = 'none';
+                return;
+            }
+            const hasBlocks = window.areaHasBlocksMap?.get(areaName) === true;
+            blockContainer.style.display = hasBlocks ? 'block' : 'none';
+        }
+
+        // Load customer data
+        async function loadProfile() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session) { window.location.replace('index.html'); return; }
+            userEmail = session.user.email;
+
+            let avatarUrl = null;
+            if (session.user.user_metadata?.avatar_url) {
+                avatarUrl = session.user.user_metadata.avatar_url;
+            } else {
+                const emailHash = md5(userEmail.trim().toLowerCase());
+                avatarUrl = `https://www.gravatar.com/avatar/${emailHash}?d=identicon&s=200`;
+            }
+
+            const { data: cust } = await _supabase
+                .from('customers')
+                .select('name, phone, address, city, area, block, avatar_url, location, customer_id')
+                .eq('email', userEmail)
+                .maybeSingle();
+
+            if (cust) {
+                document.getElementById('nameInput').value = cust.name || '';
+                document.getElementById('phoneInput').value = cust.phone || '';
+                originalPhone = cust.phone || '';
+                let addrText = cust.address || '';
+                if (addrText.includes(" | GPS: ")) {
+                    const parts = addrText.split(" | GPS: ");
+                    document.getElementById('addressInput').value = parts[0].trim();
+                    exactLatLng = parts[1].trim();
+                    updatePinButton(true);
+                } else {
+                    document.getElementById('addressInput').value = addrText;
+                }
+                // Load location from separate column if exists (new)
+                if (cust.location && !exactLatLng) {
+                    exactLatLng = cust.location;
+                    updatePinButton(true);
+                }
+                if (cust.city) {
+                    selectedCity = cust.city;
+                    document.getElementById('cityDisplay').textContent = cust.city;
+                    document.getElementById('cityDisplay').classList.remove('text-gray-500');
+                    document.getElementById('cityDisplay').classList.add('text-gray-900');
+                    document.getElementById('cityDisplay').closest('.dropdown-btn').classList.add('is-filled');
+                    await refreshAreasForCity(cust.city);
+                }
+                if (cust.area) {
+                    selectedArea = cust.area;
+                    document.getElementById('areaDisplay').textContent = cust.area;
+                    document.getElementById('areaDisplay').classList.remove('text-gray-500');
+                    document.getElementById('areaDisplay').classList.add('text-gray-900');
+                    document.getElementById('areaDisplay').closest('.dropdown-btn').classList.add('is-filled');
+                    updateBlockVisibility(cust.area);
+                }
+                document.getElementById('blockInput').value = cust.block || '';
+
+                if (cust.avatar_url) {
+                    avatarUrl = cust.avatar_url;
+                }
+                localStorage.setItem('faster_customer_id', cust.customer_id || '');
+             }
+
+            const avatarImg = document.getElementById('avatarImg');
+            const placeholder = document.getElementById('avatarPlaceholder');
+            if (avatarUrl) {
+                avatarImg.src = avatarUrl;
+                avatarImg.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                avatarImg.style.display = 'none';
+                placeholder.style.display = 'flex';
+            }
+        }
+
+        async function refreshAreasForCity(city) {
+            if (!window.cityAreaMap || !window.cityAreaMap.has(city)) {
+                currentAreas = [];
+                return;
+            }
+            const { data } = await _supabase
+                .from('delivery_areas')
+                .select('area_name')
+                .eq('city', city)
+                .eq('is_active', true);
+            currentAreas = data ? data.map(r => r.area_name.trim()).sort() : [];
+        }
+
+        // Modals
+        const selectionModal = document.getElementById('selectionModal');
+        function openCityModal() {
+            document.getElementById('modalTitle').textContent = 'Select City';
+            const list = document.getElementById('modalList');
+            list.innerHTML = '';
+
+            // "Not in my city" option
+            const notListed = document.createElement('div');
+            notListed.className = 'list-item font-semibold text-gray-500 hover:bg-gray-100 cursor-pointer flex justify-between';
+            notListed.innerHTML = '<span>Not in my city</span><i class="fas fa-times-circle text-gray-300"></i>';
+            notListed.onclick = () => {
+                selectedCity = null;
+                document.getElementById('cityDisplay').textContent = 'Select city';
+                document.getElementById('cityDisplay').classList.add('text-gray-500');
+                document.getElementById('cityDisplay').classList.remove('text-gray-900');
+                document.getElementById('cityDisplay').closest('.dropdown-btn').classList.remove('is-filled');
+                selectedArea = null;
+                document.getElementById('areaDisplay').textContent = 'Select area';
+                document.getElementById('areaDisplay').classList.add('text-gray-500');
+                document.getElementById('areaDisplay').classList.remove('text-gray-900');
+                document.getElementById('areaDisplay').closest('.dropdown-btn').classList.remove('is-filled');
+                updateBlockVisibility(null);
+                closeSelectionModal();
+            };
+            list.appendChild(notListed);
+
+            citiesList.forEach(city => {
+                const div = document.createElement('div');
+                div.className = 'list-item font-semibold text-gray-700 hover:bg-blue-50 cursor-pointer flex justify-between';
+                div.textContent = city;
+                if (selectedCity === city) div.classList.add('bg-blue-50', 'text-blue-700');
+                div.onclick = () => selectCity(city);
+                list.appendChild(div);
+            });
+            selectionModal.classList.remove('hidden');
+            selectionModal.classList.add('flex');
+        }
+
+        async function selectCity(city) {
+            selectedCity = city;
+            document.getElementById('cityDisplay').textContent = city;
+            document.getElementById('cityDisplay').classList.replace('text-gray-500', 'text-gray-900');
+            document.getElementById('cityDisplay').closest('.dropdown-btn').classList.add('is-filled');
+            selectedArea = null;
+            document.getElementById('areaDisplay').textContent = 'Select area';
+            document.getElementById('areaDisplay').classList.add('text-gray-500');
+            document.getElementById('areaDisplay').classList.remove('text-gray-900');
+            document.getElementById('areaDisplay').closest('.dropdown-btn').classList.remove('is-filled');
+            updateBlockVisibility(null);
+            await refreshAreasForCity(city);
+            closeSelectionModal();
+        }
+
+        function openAreaModal() {
+            if (!selectedCity) { alert('Please select city first.'); return; }
+            document.getElementById('modalTitle').textContent = 'Select Area';
+            const list = document.getElementById('modalList');
+            list.innerHTML = '';
+
+            // "Not in my area" option
+            const notListed = document.createElement('div');
+            notListed.className = 'list-item font-semibold text-gray-500 hover:bg-gray-100 cursor-pointer flex justify-between';
+            notListed.innerHTML = '<span>Not in my area</span><i class="fas fa-times-circle text-gray-300"></i>';
+            notListed.onclick = () => {
+                selectedArea = null;
+                document.getElementById('areaDisplay').textContent = 'Select area';
+                document.getElementById('areaDisplay').classList.add('text-gray-500');
+                document.getElementById('areaDisplay').classList.remove('text-gray-900');
+                document.getElementById('areaDisplay').closest('.dropdown-btn').classList.remove('is-filled');
+                updateBlockVisibility(null);
+                closeSelectionModal();
+            };
+            list.appendChild(notListed);
+
+            if (currentAreas.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'p-3 text-center text-gray-400 font-semibold';
+                empty.textContent = 'No active areas in this city.';
+                list.appendChild(empty);
+            } else {
+                currentAreas.forEach(area => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item font-semibold text-gray-700 hover:bg-blue-50 cursor-pointer flex justify-between';
+                    div.textContent = area;
+                    if (selectedArea === area) div.classList.add('bg-blue-50', 'text-blue-700');
+                    div.onclick = () => selectArea(area);
+                    list.appendChild(div);
+                });
+            }
+            selectionModal.classList.remove('hidden');
+            selectionModal.classList.add('flex');
+        }
+
+        function selectArea(area) {
+            selectedArea = area;
+            document.getElementById('areaDisplay').textContent = area;
+            document.getElementById('areaDisplay').classList.replace('text-gray-500', 'text-gray-900');
+            document.getElementById('areaDisplay').closest('.dropdown-btn').classList.add('is-filled');
+            updateBlockVisibility(area);
+            closeSelectionModal();
+        }
+
+        function closeSelectionModal() {
+            selectionModal.classList.add('hidden');
+            selectionModal.classList.remove('flex');
+        }
+        selectionModal.addEventListener('click', e => { if (e.target === selectionModal) closeSelectionModal(); });
+
+        // Map
+        function openMapModal() {
+            document.getElementById('mapModal').classList.replace('map-leave', 'map-enter');
+            if (!map) {
+                map = L.map('map', { zoomControl: false }).setView([31.5204, 74.3587], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+            }
+            setTimeout(() => { map.invalidateSize(); locateMe(); }, 300);
+        }
+        function closeMapModal() {
+            document.getElementById('mapModal').classList.replace('map-enter', 'map-leave');
+        }
+        function locateMe() {
+            if (!navigator.geolocation) { alert('GPS not supported'); return; }
+            navigator.geolocation.getCurrentPosition(
+                pos => map.flyTo([pos.coords.latitude, pos.coords.longitude], 18, { duration: 1.5 }),
+                () => alert('Enable location permission.'),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+        function confirmLocation() {
+            const btn = document.getElementById('confirmLocBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Pin...';
+            const center = map.getCenter();
+            exactLatLng = `${center.lat},${center.lng}`;
+            localStorage.setItem('faster_exact_location', exactLatLng);
+            setTimeout(() => {
+                closeMapModal();
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm Pin';
+                updatePinButton(true);
+                document.getElementById('addressInput').focus();
+            }, 500);
+        }
+        function updatePinButton(saved) {
+            const btn = document.getElementById('locBtn');
+            if (saved) {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Pin Saved';
+                btn.classList.add('pin-saved');
+            } else {
+                btn.innerHTML = '<i class="fas fa-map-marked-alt text-xs"></i> Pick on Map';
+                btn.classList.remove('pin-saved');
+            }
+        }
+
+        // Save Profile (including location)
+        async function updateProfile() {
+    const name = document.getElementById('nameInput').value.trim();
+    const phone = document.getElementById('phoneInput').value.trim();
+    const address = document.getElementById('addressInput').value.trim();
+    const block = document.getElementById('blockInput').value.trim();
+
+    if (!name || !phone || !address) { alert('Fill required fields.'); return; }
+    if (!selectedCity || !selectedArea) { alert('Select city and area.'); return; }
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    document.getElementById('btnIcon').className = 'fas fa-spinner fa-spin';
+    document.getElementById('btnText').textContent = 'Updating...';
+
+    try {
+        if (phone !== originalPhone) {
+            const { data: dup } = await _supabase.from('customers').select('email').eq('phone', phone).maybeSingle();
+            if (dup && dup.email !== userEmail) {
+                alert('Phone already registered.');
+                resetBtn();
+                return;
+            }
+        }
+
+        // ❌ Ab GPS address mein nahi jodega
+        // let finalAddress = address;
+        // if (exactLatLng) finalAddress += " | GPS: " + exactLatLng;
+
+        // ✅ Seedha user ka likha address use karo
+        const finalAddress = address;
+
+        let avatarUrl = undefined;
+        if (newAvatarFile) {
+            avatarUrl = await uploadToR2(newAvatarFile, "avatar", { mediaType: "image" });
+        }
+
+        const updateData = {
+            name,
+            phone,
+            address: finalAddress,       // 🧹 sirf text address
+            city: selectedCity,
+            area: selectedArea,
+            block
+        };
+        if (avatarUrl) updateData.avatar_url = avatarUrl;
+        if (exactLatLng) updateData.location = exactLatLng;   // 📍 GPS alag save
+
+        const { error } = await _supabase
+            .from('customers')
+            .update(updateData)
+            .eq('email', userEmail);
+        if (error) throw error;
+
+        localStorage.setItem('faster_name', name);
+        localStorage.setItem('faster_phone', phone);
+        localStorage.setItem('faster_address', address);
+        localStorage.setItem('faster_city', selectedCity);
+        localStorage.setItem('faster_area', selectedArea);
+        localStorage.setItem('faster_block', block);
+        localStorage.setItem('faster_exact_location', exactLatLng);
+
+        document.getElementById('btnIcon').className = 'fas fa-check-circle';
+        document.getElementById('btnText').textContent = 'Saved!';
+        btn.classList.add('bg-green-600');
+        setTimeout(() => window.location.replace('home.html'), 800);
+    } catch (err) {
+        alert('Error: ' + err.message);
+        resetBtn();
+    }
+}
+
+        function resetBtn() {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = false;
+            document.getElementById('btnIcon').className = 'fas fa-check-circle';
+            document.getElementById('btnText').textContent = 'SAVE CHANGES';
+            btn.classList.remove('bg-green-600');
+        }
+
+        window.addEventListener('offline', () => { document.getElementById('offlineBanner')?.style?.setProperty('top','0'); });
+        window.addEventListener('online', () => { document.getElementById('offlineBanner')?.style?.setProperty('top','-50px'); });
+
+        window.onload = async () => {
+            await loadDeliveryData();
+            await loadProfile();
+        };
+    </script>
+
+    <script src="global-message-notify.js"></script>
+</body>
+</html>

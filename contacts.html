@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Faster - Chats</title>
+    <link rel="icon" href="favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="contacts.css">
+</head>
+<body class="wa-body">
+
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+
+    <!-- Header -->
+    <header class="wa-header">
+        <div class="wa-header-left">
+            <i class="fas fa-arrow-left wa-back-icon" onclick="history.back()"></i>
+            <h1>Chats</h1>
+        </div>
+        <div class="wa-header-icons">
+            <i class="fas fa-camera" onclick="alert('Camera - coming soon')"></i>
+            <i class="fas fa-ellipsis-vertical" onclick="location.href='home.html'"></i>
+        </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="wa-search-wrap">
+        <div class="wa-search-bar">
+            <i class="fas fa-search"></i>
+            <input type="text" id="chatSearchInput" placeholder="Search With Name & number" oninput="filterChatList()">
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="wa-tabs no-scrollbar">
+        <button class="wa-tab active" data-tab="all" onclick="switchTab('all')">All</button>
+        <button class="wa-tab" data-tab="unread" onclick="switchTab('unread')">Unread</button>
+        <button class="wa-tab" data-tab="favorites" onclick="switchTab('favorites')">Favorites</button>
+        <button class="wa-tab" data-tab="groups" onclick="switchTab('groups')">Groups</button>
+        <button class="wa-tab wa-tab-add" onclick="toggleNewChatPanel()"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <!-- Chat List -->
+    <div id="chatListContainer" class="wa-chat-list">
+        <p class="wa-loading">Loading chats...</p>
+    </div>
+
+    <!-- Floating New Chat Button -->
+    <button class="wa-fab" onclick="toggleNewChatPanel()">
+        <i class="fas fa-comment-medical"></i>
+    </button>
+
+    <!-- New Chat Panel (existing phone-search-to-start-chat feature, relocated here) -->
+    <div id="newChatOverlay" class="wa-overlay hidden" onclick="if(event.target===this) toggleNewChatPanel()">
+        <div class="wa-new-chat-panel">
+            <div class="wa-panel-header">
+                <h3>Start New Chat</h3>
+                <i class="fas fa-times" onclick="toggleNewChatPanel()"></i>
+            </div>
+            <p class="wa-panel-sub">Enter your friend's phone number to find them on Faster</p>
+            <div class="wa-panel-search">
+                <input type="tel" id="searchPhone" placeholder="03xx-xxxxxxx">
+                <button onclick="searchUser()">Search</button>
+            </div>
+            <div id="searchResult" class="hidden mt-3"></div>
+        </div>
+    </div>
+
+    <!-- Bottom Nav (WhatsApp-style) -->
+    <nav class="wa-bottom-nav">
+        <div class="wa-nav-item active" onclick="switchTab('all')">
+            <i class="fas fa-comment-dots"></i>
+            <span>Chats</span>
+        </div>
+        <div class="wa-nav-item" onclick="alert('Updates - coming soon')">
+            <i class="fas fa-circle-notch"></i>
+            <span>Updates</span>
+        </div>
+        <div class="wa-nav-item" onclick="alert('Communities - coming soon')">
+            <i class="fas fa-user-group"></i>
+            <span>Communities</span>
+        </div>
+        <div class="wa-nav-item" onclick="alert('Calls - coming soon')">
+            <i class="fas fa-phone"></i>
+            <span>Calls</span>
+        </div>
+    </nav>
+
+    <script src="contacts.js"></script>
+</body>
+</html>

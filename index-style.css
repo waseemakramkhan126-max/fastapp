@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+html, body { 
+    font-family: 'Plus Jakarta Sans', sans-serif; 
+    overscroll-behavior-y: none; 
+    -webkit-tap-highlight-color: transparent; 
+    background-color: #f8fafc; /* Very light, clean grayish-blue background */
+}
+
+/* Modern Clean Card */
+.modern-card {
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); /* Soft, elegant shadow */
+    border: 1px solid #f1f5f9;
+}
+
+/* Brand Logo Adjustment */
+.brand-logo-gol { 
+    object-fit: cover; 
+    border-radius: 9999px; 
+    border: 2px solid #e2e8f0;
+    background: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Modern Input Fields */
+.modern-input {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    color: #1e293b;
+    font-size: 0.95rem;
+}
+
+.modern-input:focus {
+    background: #ffffff;
+    border-color: #3b82f6; /* Blue brand focus */
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); /* Smooth focus ring */
+}
+
+.modern-input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* Dropdown Arrow Fix for Select */
+select.modern-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 1rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+}
+
+/* Primary Button (Save & Continue) */
+.modern-btn {
+    background: #2CA9C9; /* Solid Blue */
+    color: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(44,169,201, 0.25);
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.modern-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 8px rgba(44,169,201, 0.25);
+}
+
+.modern-btn:disabled {
+    background: #cbd5e1;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* GPS Button */
+.gps-btn {
+    background: #eff6ff; /* Light blue tint */
+    color: #2CA9C9;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 16px;
+    transition: all 0.2s ease;
+}
+
+.gps-btn:active {
+    background: #dbeafe;
+    transform: scale(0.98);
+}

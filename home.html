@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Faster - Home</title>
+    <link rel="icon" href="favicon.ico">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2CA9C9">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="home.css">
+</head>
+<body>
+
+    <!-- Offline Banner -->
+    <div id="offlineBanner" class="fixed top-[-50px] left-0 w-full bg-red-500 text-white text-center text-[10px] uppercase tracking-widest py-2 font-black shadow-md flex justify-center items-center gap-2 z-50">
+        <i class="fas fa-wifi-slash"></i> No Internet Connection
+    </div>
+
+    <audio id="notifSound" src="https://pub-46c1f50284b64647914d7901e1dd5fea.r2.dev/sound_garage-cat-meow-8-fx-306184.mp3" preload="auto"></audio>
+    <script src="notification-config.js"></script>
+
+    <div id="sidebarOverlay" onclick="toggleMenu()"></div>
+
+    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[60%] max-w-[300px] bg-white z-50 shadow-2xl p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-8 mt-2">
+            <div class="flex items-center gap-3">
+                <img id="sideLogo" src="" class="w-10 h-10 brand-logo-gol hidden border-2 border-orange-500">
+                <h2 class="text-xl font-black text-blue-800 tracking-tighter">Faster <span class="text-blue-500 italic">App</span></h2>
+            </div>
+            <i class="fas fa-times text-xl text-gray-400 cursor-pointer p-2 active:scale-90 transition-transform" onclick="toggleMenu()"></i>
+        </div>
+        <nav class="space-y-3 flex-1">
+            <div onclick="location.href='profile.html'" class="p-1 bg-blue-50 rounded-2xl cursor-pointer border border-blue-100 flex justify-between items-center group active:bg-blue-100 transition-all shadow-sm">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-user-edit text-blue-500 text-lg"></i>
+                    <span class="font-bold text-gray-700">My Profile</span>
+                </div>
+                <i class="fas fa-chevron-right text-[10px] text-blue-300"></i>
+            </div>
+              <!-- sidebar me chat button ka code yahase shuro ho rha hai -->
+            <div onclick="location.href='contacts.html'" class="p-1 bg-blue-50 rounded-2xl cursor-pointer border border-blue-100 flex justify-between items-center group active:bg-blue-100 transition-all shadow-sm">
+                <div class="flex items-center gap-3">
+                <i class="fas fa-user-friends text-blue-500 text-lg"></i>
+                <span class="font-bold text-gray-700">Chat with Friends</span>
+                </div>
+              <i class="fas fa-chevron-right text-[10px] text-blue-300"></i>
+           </div>
+            <!-- aur yaha pe khtam ho rha hai -->
+            <div onclick="location.href='wallet.html'" class="p-1 bg-orange-50 rounded-2xl cursor-pointer border border-orange-100 flex justify-between items-center group active:bg-orange-100 transition-all shadow-sm">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-wallet text-orange-500 text-lg"></i>
+                    <span class="font-bold text-gray-700">My Wallet</span>
+                </div>
+                <i class="fas fa-chevron-right text-[10px] text-orange-300"></i>
+            </div>
+            <a href="csr-chat.html" class="flex items-center gap-4 p-1 hover:bg-gray-50 rounded-2xl transition font-bold text-gray-600 border border-transparent active:border-gray-200 cursor-pointer">
+                <i class="fas fa-comment-dots text-green-500 text-2xl"></i>
+                <span>CSR Help</span>
+            </a>
+        </nav>
+        <button onclick="logout()" class="w-full bg-red-50 text-red-600 font-black py-2 rounded-2xl flex items-center justify-center gap-2 mt-auto uppercase tracking-widest text-xs active:bg-red-100 transition border border-red-100 shadow-sm mb-4">
+            <i class="fas fa-power-off"></i> Logout Account
+        </button>
+    </div>
+
+    <!-- ================= NEW HEADER (matches target design) ================= -->
+    <header class="top-header">
+        <div class="header-row">
+            <i class="fas fa-bars header-icon" onclick="toggleMenu()"></i>
+
+            <div class="deliver-block" onclick="location.href='profile.html'">
+                <i class="fas fa-map-marker-alt deliver-pin"></i>
+                <div class="deliver-text">
+                    <span class="deliver-label">Deliver to</span>
+                    <span class="deliver-value">
+                        <span id="userName">Customer</span>
+                        <i class="fas fa-chevron-down deliver-chev"></i>
+                    </span>
+                </div>
+            </div>
+            <!-- Greeting text kept alive for other features/future use, just not shown in this compact header -->
+            <span id="appbarGreeting" class="sr-only"></span>
+
+            <div class="header-logo-wrap">
+                <img id="appLogo" src="" alt="Logo" class="header-logo hidden">
+                <div id="logoFallback" class="header-logo header-logo-fallback">
+                    <i class="fas fa-bolt"></i>
+                </div>
+            </div>
+
+            <div class="notif-wrap" onclick="openNotifications()">
+                <i id="notifBell" class="fas fa-bell"></i>
+                <div id="notifBadge" class="notif-badge"><span id="notifCount">0</span></div>
+            </div>
+        </div>
+
+    </header>
+
+    <!-- ================= VENDORS ROW (logo + name, auto-slide + manual swipe, click -> that vendor's products) ================= -->
+    <div class="vendor-section-wrap">
+        <div class="vendor-strip-wrapper" id="vendorStripWrapper">
+            <div class="vendor-strip" id="vendorStrip"></div>
+        </div>
+    </div>
+
+    <!-- ================= PROMOTIONS & OFFERS (full-width banner, image + playable video, auto-slide + manual swipe) ================= -->
+    <div class="mt-4 px-5">
+        <div class="section-head">
+            <h2>Promotions &amp; Offers</h2>
+            <a href="#" class="see-all">See all</a>
+        </div>
+        <div id="promoContainer" class="relative">
+            <div id="promoSlider" class="flex overflow-x-auto no-scrollbar scroll-smooth"></div>
+            <div id="promoDots" class="promo-dots"></div>
+        </div>
+    </div>
+
+    <!-- ================= AI ORDER + ACTIVE/COMPLETED (existing features, restyled) ================= -->
+    <div class="mt-6 px-5 flex items-stretch gap-3">
+        <div onclick="location.href='new-order.html'" class="ai-order-card">
+            <div class="ai-bot-icon"><i class="fas fa-robot"></i></div>
+            <span>Custom Order with AI assistant</span>
+        </div>
+        <div id="activeOrdersCard" onclick="openActiveOrders()" class="stat-card">
+            <div class="stat-icon stat-icon-green"><i class="fas fa-briefcase"></i></div>
+            <span class="stat-num" id="activeCountBadge">0</span>
+            <span class="stat-label">Active Orders</span>
+            <span class="stat-view">View</span>
+        </div>
+        <div onclick="location.href='completed.html'" class="stat-card">
+            <div class="stat-icon stat-icon-blue"><i class="fas fa-check"></i></div>
+            <span class="stat-num" id="doneCountBadge">0</span>
+            <span class="stat-label">Completed Orders</span>
+            <span class="stat-view">View</span>
+        </div>
+    </div>
+
+    <!-- ================= MY ACTIVITY / FASTRIDE (new placeholder card - no ride backend yet) ================= -->
+    <div class="mt-6 px-5">
+        <div class="section-head">
+            <h2>My Activity</h2>
+            <a href="active-orders.html" class="see-all">See all</a>
+        </div>
+        <div class="fastride-card" onclick="alert('FastRide is coming soon!')">
+            <div class="fastride-icon-left"><i class="fas fa-taxi"></i></div>
+            <div class="fastride-text">
+                <h3>FastRide</h3>
+                <p>Indrive-style Rides</p>
+            </div>
+            <div class="fastride-icon-right flex items-center gap-1.5">
+                <!-- Bike (Peeche - halka sa space) -->
+                <i class="fas fa-motorcycle text-lg"></i>
+                <!-- Car (Aage) -->
+                <i class="fas fa-car-side text-lg"></i>
+
+            </div>
+    </div>
+
+    <!-- ================= WALLET DISPLAY (existing feature, kept) ================= -->
+    <div id="walletMiniDisplay" class="hidden px-5 pt-2 flex items-center justify-center gap-2 flex-wrap">
+        <span id="walletLoading" class="text-[10px] text-gray-400 font-bold uppercase hidden"><i class="fas fa-sync-alt animate-spin mr-1"></i> Syncing...</span>
+        <p id="homePendBox" onclick="location.href='wallet.html'" class="hidden cursor-pointer active:scale-95 text-[10px] font-black text-red-600 bg-red-100 px-3 py-1 rounded-full uppercase border border-red-200 shadow-sm transition-all">
+            <i class="fas fa-exclamation-circle mr-1"></i> Pending: <span id="homePend">0</span>
+        </p>
+        <p id="homeRemBox" onclick="location.href='wallet.html'" class="hidden cursor-pointer active:scale-95 text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full uppercase border border-emerald-200 shadow-sm transition-all">
+            <i class="fas fa-check-circle mr-1"></i> Wallet: <span id="homeRem">0</span>
+        </p>
+    </div>
+
+    <!-- Spacer so content isn't hidden behind bottom nav -->
+    <div class="h-24"></div>
+
+    <!-- ================= BOTTOM NAV (new - replaces floating chat bubble) ================= -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="location.href='home.html'">
+            <i class="fas fa-house"></i>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" onclick="openActiveOrders()">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Orders</span>
+        </div>
+        <div class="nav-item nav-item-center" onclick="document.getElementById('promoContainer').scrollIntoView({behavior:'smooth'})">
+            <div class="nav-center-icon"><i class="fas fa-clapperboard"></i></div>
+            <span>Reels/Feed</span>
+        </div>
+         <div class="nav-item" onclick="location.href='contacts.html'">
+        <!-- Chat + Phone Combo -->
+
+
+<div class="relative w-8 h-8 flex items-center justify-center">
+    <i class="fas fa-comment-dots text-7xl text-blue-500"></i>
+    <i class="fas fa-phone text-green-500 absolute" 
+       style="font-size: 16px; top: 40%; left: 50%; margin-top: -5px; margin-left: -5px;
+              text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;"></i>
+</div>
+
+
+
+    <!-- Label -->
+    <span>Chats</span>
+</div>
+        <div class="nav-item" onclick="location.href='profile.html'">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </div>
+    </nav>
+
+    <script src="home.js"></script>
+    <script src="fcm-init.js"></script>
+
+    <script src="global-message-notify.js"></script>
+</body>
+</html>
